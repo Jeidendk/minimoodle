@@ -46,11 +46,10 @@ function loadState() {
 }
 
 
-export default function EvaluationsView({ data, user, setView, saveRows, goCourse }) {
-  const stored = loadState();
+export default function EvaluationsView({ data, user, setView, saveRows, deleteRows, goCourse, editQuizId }) {
   const [activeTab, setActiveTab] = useState('individual');
-  const [config, setConfig] = useState(stored?.config || DEFAULT_CONFIG);
-  const [questions, setQuestions] = useState(stored?.questions || [DEFAULT_QUESTION(), { ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }, { ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }, { ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }]);
+  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [questions, setQuestions] = useState([DEFAULT_QUESTION(), { ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }, { ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }, { ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [toast, setToast] = useState(null);
   const [showBankModal, setShowBankModal] = useState(false);
@@ -60,6 +59,48 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
   const csvInputRef = useRef(null);
 
   const pastePreview = useMemo(() => parseQuestions(pasteText), [pasteText]);
+
+  // Load initial data based on editQuizId or localStorage
+  useEffect(() => {
+    if (editQuizId) {
+      const quiz = data.quizzes?.find(q => q.id === editQuizId);
+      if (quiz) {
+        setConfig({
+          title: quiz.title || '',
+          courseId: quiz.course_id || '',
+          sectionId: quiz.section_id || '',
+          openTime: quiz.open_time ? quiz.open_time.slice(0, 16) : '',
+          closeTime: quiz.close_time ? quiz.close_time.slice(0, 16) : '',
+          timeLimit: quiz.time_limit || '',
+          type: quiz.type || 'Cuestionario',
+          questionsPerAttempt: quiz.questions_per_attempt || 20,
+          shuffleQuestions: quiz.shuffle_questions !== false,
+          shuffleOptions: quiz.shuffle_options !== false,
+          showResults: quiz.show_results !== false,
+          allowRetries: quiz.allow_retries !== false,
+          status: quiz.published ? 'Publicada' : 'Borrador'
+        });
+        
+        const quizQs = data.questions?.filter(q => q.quiz_id === editQuizId).sort((a,b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+        if (quizQs && quizQs.length > 0) {
+          setQuestions(quizQs.map(q => ({
+            id: q.id,
+            statement: q.prompt || '',
+            options: q.options || ['', '', '', ''],
+            correctIndex: typeof q.answer_index === 'number' ? q.answer_index : -1,
+            feedback: q.explanation || '',
+            points: q.points || 1,
+            image: q.image || null,
+            _db: true
+          })));
+        }
+      }
+    } else {
+      const stored = loadState();
+      if (stored?.config) setConfig(stored.config);
+      if (stored?.questions && stored.questions.length > 0) setQuestions(stored.questions);
+    }
+  }, [editQuizId, data.quizzes, data.questions]);
 
   // Set default course/section if empty
   useEffect(() => {
@@ -78,8 +119,10 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
   }, [config.courseId, config.sectionId, data?.sections]);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ config, questions })); } catch {}
-  }, [config, questions]);
+    if (!editQuizId) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ config, questions })); } catch {}
+    }
+  }, [config, questions, editQuizId]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
@@ -170,7 +213,7 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
 
   const saveDraft = () => {
     updateConfig({ status: 'Borrador' });
-    showToast('Borrador guardado');
+    publish(true);
   };
 
   const handleSaveAsBank = () => {
@@ -226,12 +269,14 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
     }
   }
 
-  const publish = () => {
-    const invalid = questions.findIndex(q => questionStatus(q) !== 'Completa');
-    if (invalid !== -1) {
-      setActiveIdx(invalid);
-      showToast(`Falta completar la pregunta ${invalid + 1}`);
-      return;
+  const publish = (isDraft = false) => {
+    if (!isDraft) {
+      const invalid = questions.findIndex(q => questionStatus(q) !== 'Completa');
+      if (invalid !== -1) {
+        setActiveIdx(invalid);
+        showToast(`Falta completar la pregunta ${invalid + 1}`);
+        return;
+      }
     }
     if (!config.title.trim()) { showToast('Falta título de la evaluación'); return; }
     if (!config.courseId) { showToast('Selecciona un curso primero'); return; }
@@ -254,7 +299,9 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
       if (count > totalBankQs) { showToast(`Los bancos tienen ${totalBankQs} preguntas; no puedes sortear ${count}`); return; }
     }
 
-    const quizId = uid('quiz');
+    const quizId = editQuizId || uid('quiz');
+    const existingQuiz = editQuizId ? data.quizzes.find(q => q.id === editQuizId) : null;
+    
     const mpq = Number(config.minutesPerQuestion) || 1;
     const requested = Number(config.questionCount) || 0;
     const drawCount = isBank ? requested : questions.length;
@@ -265,23 +312,30 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
       section_id: config.sectionId,
       title: config.title.trim(),
       instructions: `Evaluación de tipo: ${config.type}.`,
-      opens_at: new Date().toISOString(),
-      closes_at: "2026-12-31T23:59:00.000Z",
+      opens_at: config.openTime ? new Date(config.openTime).toISOString() : new Date().toISOString(),
+      closes_at: config.closeTime ? new Date(config.closeTime).toISOString() : "2026-12-31T23:59:00.000Z",
       time_limit_minutes: Math.max(1, drawCount * mpq),
       bank_id: isBank ? finalBankId : null,
       question_count: requested > 0 ? drawCount : 0,
       minutes_per_question: mpq,
       shuffle_questions: config.shuffleQuestions !== false,
       shuffle_options: config.shuffleOptions !== false,
-      published: true,
-      created_at: new Date().toISOString()
+      published: !isDraft,
+      created_at: existingQuiz?.created_at || new Date().toISOString()
     };
 
     if (saveRows) {
       saveRows('quizzes', newQuiz);
       if (!isBank) {
+        if (editQuizId && deleteRows) {
+          const existingIds = data.questions.filter(q => q.quiz_id === editQuizId).map(q => q.id);
+          const currentIds = questions.filter(q => q._db).map(q => q.id);
+          const toDelete = existingIds.filter(id => !currentIds.includes(id));
+          if (toDelete.length > 0) deleteRows('questions', toDelete);
+        }
+        
         const newQuestions = questions.map((q) => ({
-          id: uid('q'),
+          id: q._db ? q.id : uid('q'),
           quiz_id: quizId,
           bank_id: null,
           prompt: q.statement,
@@ -290,21 +344,23 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
           explanation: q.feedback,
           points: q.points,
           image: q.image || null,
-          created_at: new Date().toISOString()
+          created_at: q._db && editQuizId ? (data.questions.find(dbq => dbq.id === q.id)?.created_at || new Date().toISOString()) : new Date().toISOString()
         }));
         saveRows('questions', newQuestions);
       }
     }
 
-    updateConfig({ status: 'Publicada' });
+    updateConfig({ status: isDraft ? 'Borrador' : 'Publicada' });
     showToast(isBank
-      ? `✓ Simulador "${config.title}" publicado (sortea ${drawCount} del banco)`
-      : `✓ Evaluación "${config.title}" publicada`);
+      ? `✓ Simulador "${config.title}" ${isDraft ? 'guardado' : 'publicado'} (sortea ${drawCount} del banco)`
+      : `✓ Evaluación "${config.title}" ${isDraft ? 'guardada' : 'publicada'}`);
 
-    setTimeout(() => {
-      if (goCourse) goCourse(config.courseId);
-      else setView('courses');
-    }, 1500);
+    if (!isDraft) {
+      setTimeout(() => {
+        if (goCourse) goCourse(config.courseId);
+        else setView('courses');
+      }, 1500);
+    }
   };
 
   // Load an existing bank's questions into the builder (for reuse/editing)
@@ -429,17 +485,22 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
   }, [activeQ]);
 
   return (
-    <section className="evaluations-view fade-in">
+    <section className="eval-view fade-in">
       {/* Hidden inputs for uploads */}
       <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={(e) => handleImageUpload(e.target.files?.[0])} />
       <input ref={csvInputRef} type="file" accept=".txt,.json" hidden onChange={(e) => handleCsvUpload(e.target.files?.[0])} />
 
       {/* HEADER */}
-      <div className="eval-header-section">
-        <div className="eval-header-text">
-          <div className="eval-breadcrumb">GESTIÓN DE EVALUACIONES</div>
-          <h1>Crear evaluación</h1>
-          <p>Configura, carga materiales, preguntas y respuestas para cada curso.</p>
+      <div className="eval-header">
+        <div className="eval-header-left" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button className="eval-btn-outline" onClick={() => setView('teacher')} style={{ padding: '0.4rem 0.6rem', border: 'none', background: '#F1F5F9', color: '#475569' }} title="Volver a mis evaluaciones">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          </button>
+          <div>
+            <h4 style={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--color-primary)', letterSpacing: '1px' }}>Gestión de Evaluaciones</h4>
+            <h1>{editQuizId ? 'Editar evaluación' : 'Crear evaluación'}</h1>
+            <p>Configura, carga materiales, preguntas y respuestas para cada curso.</p>
+          </div>
         </div>
 
         <div className="eval-top-metrics">

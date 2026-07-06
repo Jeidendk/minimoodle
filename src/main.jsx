@@ -12,6 +12,7 @@ import ResultView from "./views/ResultView";
 import TeacherView from "./views/TeacherView";
 import AttemptsView from "./views/AttemptsView";
 import LoginView from "./views/LoginView";
+import EvaluationsManagerView from "./views/EvaluationsManagerView";
 import EvaluationsView from "./views/EvaluationsView";
 import StudentsView from "./views/StudentsView";
 import GradesView from "./views/GradesView";
@@ -37,6 +38,7 @@ function App() {
   const [view, setView] = useState("area");
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [selectedQuizId, setSelectedQuizId] = useState(null);
+  const [editQuizId, setEditQuizId] = useState(null);
   const [courseSearch, setCourseSearch] = useState("");
   const [courseFilter, setCourseFilter] = useState("all");
   const [courseSort, setCourseSort] = useState("name");
@@ -254,7 +256,8 @@ function App() {
           {view === "course" && <CourseView data={data} course={selectedCourse} user={user} goQuiz={goQuiz} setView={setView} saveRows={saveRows} deleteRows={deleteRows} />}
           {view === "quiz" && <QuizView data={data} quiz={selectedQuiz} user={user} submitAttempt={submitAttempt} setView={setView} />}
           {view === "result" && <ResultView data={data} quiz={selectedQuiz} user={user} setView={setView} />}
-          {view === "teacher" && <EvaluationsView data={data} user={user} setView={setView} saveRows={saveRows} goCourse={goCourse} />}
+          {view === "teacher" && <EvaluationsManagerView data={data} user={user} setView={setView} setEditQuizId={setEditQuizId} deleteRows={deleteRows} />}
+          {view === "evaluation-editor" && <EvaluationsView data={data} user={user} setView={setView} saveRows={saveRows} deleteRows={deleteRows} goCourse={goCourse} editQuizId={editQuizId} />}
           {view === "grades" && <GradesView setView={setView} />}
           {view === "students" && <StudentsView data={data} user={user} setView={setView} saveRows={saveRows} deleteRows={deleteRows} />}
           {view === "attempts" && <AttemptsView data={data} setView={setView} />}
