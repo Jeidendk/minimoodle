@@ -33,7 +33,7 @@ const DEFAULT_QUESTION = () => ({
   image: '',
   answerType: 'Opción múltiple',
   difficulty: 'Media',
-  points: 4,
+  points: 1,
   options: ['$7', '$10', '$12', '$14'],
   correctIndex: 2,
   feedback: 'Cada cuaderno cuesta $4. Al comprar 3 cuadernos: $4 x 3 = $12.',
@@ -106,7 +106,7 @@ function parseJson(text) {
       options: Array.isArray(q.opciones || q.options) ? (q.opciones || q.options).map(String) : [],
       correctIndex: Number(q.correcta ?? q.correctIndex ?? -1),
       feedback: String(q.retro || q.feedback || ''),
-      points: Number(q.puntos || q.points || 4),
+      points: Number(q.puntos || q.points || 1),
     })).filter(q => q.statement && q.options.length >= 2 && q.correctIndex >= 0);
   } catch { return []; }
 }
@@ -373,7 +373,7 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
         image: q.image || '',
         answerType: 'Opción múltiple',
         difficulty: 'Media',
-        points: q.points || 4,
+        points: q.points || 1,
         options: Array.isArray(q.options) ? q.options : [],
         correctIndex: Number(q.answer_index ?? -1),
         feedback: q.explanation || '',
@@ -711,6 +711,19 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
                         onChange={(e) => updateActive({ points: Number(e.target.value) || 1 })}
                       />
                       <span className="eval-badge purple">{activeQ.points} puntos</span>
+                      <button
+                        type="button"
+                        className="eval-btn-text"
+                        style={{ fontSize: '0.75rem', padding: 0 }}
+                        title="Aplicar estos puntos a todas las preguntas"
+                        onClick={() => {
+                          const p = Number(activeQ.points) || 1;
+                          setQuestions((qs) => qs.map((q) => ({ ...q, points: p })));
+                          showToast(`Todas las preguntas: ${p} pto(s)`);
+                        }}
+                      >
+                        Aplicar a todas
+                      </button>
                     </div>
                     <div className="eval-qh-actions">
                       <button title="Subir" onClick={() => moveQuestion(-1)}>
