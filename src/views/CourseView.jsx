@@ -12,6 +12,11 @@ export default function CourseView({ data, course, user, goQuiz, setView, saveRo
   const [sectionForm, setSectionForm] = useState({ title: '', description: '' });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
 
+  // Quiz (activity) edit/delete state
+  const [editQuiz, setEditQuiz] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [deleteQuizConfirm, setDeleteQuizConfirm] = useState(null);
+
   if (!course) return <p>Curso no encontrado.</p>;
   
   const isTeacher = user?.role === 'teacher';
@@ -118,6 +123,49 @@ export default function CourseView({ data, course, user, goQuiz, setView, saveRo
     setShowDeleteConfirm(null);
   };
 
+  // Quiz (activity) edit / delete
+  const poolSize = (quiz) => {
+    if (quiz.bank_id) return data.questions.filter(q => q.bank_id === quiz.bank_id).length;
+    return data.questions.filter(q => q.quiz_id === quiz.id).length;
+  };
+
+  const openEditQuiz = (quiz) => {
+    setEditForm({
+      title: quiz.title || '',
+      section_id: quiz.section_id || '',
+      published: quiz.published !== false,
+      question_count: quiz.question_count || 0,
+      minutes_per_question: quiz.minutes_per_question || 1,
+      shuffle_questions: quiz.shuffle_questions !== false,
+      shuffle_options: quiz.shuffle_options !== false,
+    });
+    setEditQuiz(quiz);
+  };
+
+  const saveQuizEdit = () => {
+    if (!editForm.title.trim()) return;
+    const count = Number(editForm.question_count) || 0;
+    const mpq = Number(editForm.minutes_per_question) || 1;
+    const effective = count > 0 ? Math.min(count, poolSize(editQuiz)) : poolSize(editQuiz);
+    saveRows('quizzes', {
+      ...editQuiz,
+      title: editForm.title.trim(),
+      section_id: editForm.section_id || null,
+      published: editForm.published,
+      question_count: count,
+      minutes_per_question: mpq,
+      shuffle_questions: editForm.shuffle_questions,
+      shuffle_options: editForm.shuffle_options,
+      time_limit_minutes: Math.max(1, effective * mpq),
+    });
+    setEditQuiz(null);
+  };
+
+  const confirmDeleteQuiz = () => {
+    deleteRows('quizzes', deleteQuizConfirm.id);
+    setDeleteQuizConfirm(null);
+  };
+
   // Activity List Renderer
   const renderActivityList = (sectionQuizzes) => {
     if (!sectionQuizzes.length) {
@@ -131,19 +179,35 @@ export default function CourseView({ data, course, user, goQuiz, setView, saveRo
     return (
       <div className="activityList">
         {sectionQuizzes.map((quiz) => (
-          <button key={quiz.id} className="activity" onClick={() => goQuiz(quiz.id)}>
+          <div key={quiz.id} className="activity" role="button" tabIndex={0} onClick={() => goQuiz(quiz.id)}>
             <div className="activityIconWrapper">
               <span className="activityIcon">📝</span>
             </div>
             <div className="activityDetails">
-              <strong>{quiz.title} {!quiz.published && <span className="eval-badge orange" style={{ fontSize: '0.65rem', marginLeft: '0.5rem' }}>Oculto</span>}</strong>
+              <strong>
+                {quiz.title}
+                {quiz.bank_id && <span className="eval-badge purple" style={{ fontSize: '0.65rem', marginLeft: '0.5rem' }}>Banco</span>}
+                {!quiz.published && <span className="eval-badge orange" style={{ fontSize: '0.65rem', marginLeft: '0.5rem' }}>Oculto</span>}
+              </strong>
               <small>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                {quiz.time_limit_minutes} min • Apertura: {formatDate(quiz.opens_at)}
+                {quiz.question_count > 0 ? `${quiz.question_count} preguntas` : `${poolSize(quiz)} preguntas`} • {quiz.time_limit_minutes} min • Apertura: {formatDate(quiz.opens_at)}
               </small>
             </div>
-            <span className="activityAction primary compact">Entrar</span>
-          </button>
+            <div className="activity-actions" onClick={(e) => e.stopPropagation()}>
+              {isTeacher && (
+                <>
+                  <button className="activity-icon-btn" title="Editar simulador" onClick={() => openEditQuiz(quiz)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                  <button className="activity-icon-btn danger" title="Eliminar simulador" onClick={() => setDeleteQuizConfirm(quiz)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </>
+              )}
+              <span className="activityAction primary compact" onClick={() => goQuiz(quiz.id)}>Entrar</span>
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -385,6 +449,96 @@ export default function CourseView({ data, course, user, goQuiz, setView, saveRo
               >
                 Sí, eliminar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================== EDIT QUIZ MODAL =================== */}
+      {editQuiz && (
+        <div className="modal-overlay" onClick={() => setEditQuiz(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h2>Editar simulador</h2>
+              <button className="modal-close" onClick={() => setEditQuiz(null)}>&times;</button>
+            </div>
+
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              <div className="form-field">
+                <label>Título <span style={{ color: '#EF4444' }}>*</span></label>
+                <input type="text" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} autoFocus />
+              </div>
+
+              {sections.length > 0 && (
+                <div className="form-field">
+                  <label>Sección / Unidad</label>
+                  <select value={editForm.section_id} onChange={e => setEditForm({ ...editForm, section_id: e.target.value })}>
+                    <option value="">Actividades generales</option>
+                    {sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-field">
+                  <label>Preguntas por intento (0 = todas)</label>
+                  <input type="number" min="0" max={poolSize(editQuiz)} value={editForm.question_count} onChange={e => setEditForm({ ...editForm, question_count: Math.max(0, Number(e.target.value) || 0) })} />
+                  <small style={{ color: 'var(--color-muted)', fontSize: '0.72rem' }}>Disponibles: {poolSize(editQuiz)}</small>
+                </div>
+                <div className="form-field">
+                  <label>Minutos por pregunta</label>
+                  <input type="number" min="1" value={editForm.minutes_per_question} onChange={e => setEditForm({ ...editForm, minutes_per_question: Number(e.target.value) || 1 })} />
+                </div>
+              </div>
+
+              <div className="quiz-edit-toggles">
+                {[
+                  ['published', 'Publicado (visible para estudiantes)'],
+                  ['shuffle_questions', 'Mezclar preguntas'],
+                  ['shuffle_options', 'Mezclar opciones'],
+                ].map(([key, label]) => (
+                  <label key={key} className="quiz-edit-toggle-row">
+                    <span>{label}</span>
+                    <button type="button" className={`eval-toggle ${editForm[key] ? 'checked' : ''}`} onClick={() => setEditForm({ ...editForm, [key]: !editForm[key] })}>
+                      <div className="eval-toggle-knob"></div>
+                    </button>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setEditQuiz(null)}>Cancelar</button>
+              <button className="btn-primary" onClick={saveQuizEdit} disabled={!editForm.title?.trim()}>Guardar cambios</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================== DELETE QUIZ CONFIRM =================== */}
+      {deleteQuizConfirm && (
+        <div className="modal-overlay" onClick={() => setDeleteQuizConfirm(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+              <h2 style={{ color: '#DC2626' }}>Eliminar simulador</h2>
+              <button className="modal-close" onClick={() => setDeleteQuizConfirm(null)}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'center', padding: '1.5rem 2rem' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem auto' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </div>
+              <p style={{ fontSize: '1rem', color: '#334155', marginBottom: '0.5rem' }}>
+                ¿Eliminar <strong>"{deleteQuizConfirm.title}"</strong>?
+              </p>
+              <p style={{ fontSize: '0.85rem', color: '#94A3B8' }}>
+                {deleteQuizConfirm.bank_id
+                  ? 'El simulador se elimina. El banco de preguntas y otros simuladores no se ven afectados.'
+                  : 'Se eliminarán también sus preguntas e intentos. No se puede deshacer.'}
+              </p>
+            </div>
+            <div className="modal-footer" style={{ justifyContent: 'center', gap: '1rem' }}>
+              <button className="btn-secondary" onClick={() => setDeleteQuizConfirm(null)}>Cancelar</button>
+              <button className="btn-primary" style={{ background: '#DC2626', borderColor: '#DC2626' }} onClick={confirmDeleteQuiz}>Sí, eliminar</button>
             </div>
           </div>
         </div>
