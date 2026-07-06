@@ -528,22 +528,35 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
 
               {config.origen === 'bank' ? (
                 <div className="eval-form-group">
-                  <label>Banco de preguntas</label>
-                  <div className="eval-select-wrapper">
-                    <select value={config.bankId} onChange={(e) => loadBank(e.target.value)}>
-                      <option value="">➕ Nuevo banco…</option>
-                      {(data.banks || []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                  <label>Bancos de preguntas (puedes elegir varios)</label>
+                  <div className="eval-multi-select" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', padding: '0.5rem', maxHeight: '150px', overflowY: 'auto', background: 'white' }}>
+                    {(data.question_banks || []).length > 0 ? (data.question_banks || []).map((b) => (
+                      <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.25rem 0', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={config.bankIds.includes(b.id)} 
+                          onChange={(e) => {
+                            const newIds = e.target.checked 
+                              ? [...config.bankIds, b.id]
+                              : config.bankIds.filter(id => id !== b.id);
+                            updateConfig({ bankIds: newIds });
+                          }} 
+                        />
+                        <span>{b.name}</span>
+                        <span style={{ color: 'var(--color-muted)', fontSize: '0.8rem' }}>({data.questions.filter(q => q.bank_id === b.id).length} preg)</span>
+                      </label>
+                    )) : (
+                      <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', padding: '0.5rem' }}>No hay bancos disponibles. Crea uno nuevo.</div>
+                    )}
                   </div>
+                  {config.bankIds.length === 0 && (
+                     <div style={{ marginTop: '0.5rem' }}>
+                       <label style={{ fontSize: '0.85rem' }}>O crea un nuevo banco al publicar:</label>
+                       <input type="text" className="eval-input" value={config.bankName} placeholder="Nombre del nuevo banco" onChange={(e) => updateConfig({ bankName: e.target.value })} />
+                     </div>
+                  )}
                 </div>
               ) : <div className="eval-form-group empty"></div>}
-
-              {config.origen === 'bank' && !config.bankId && (
-                <div className="eval-form-group">
-                  <label>Nombre del nuevo banco</label>
-                  <input type="text" className="eval-input" value={config.bankName} placeholder="Ej. Banco Matemática 3ro BGU" onChange={(e) => updateConfig({ bankName: e.target.value })} />
-                </div>
-              )}
 
               {/* Questions-per-attempt works in BOTH modes: 0 = todas */}
               <div className="eval-form-group">

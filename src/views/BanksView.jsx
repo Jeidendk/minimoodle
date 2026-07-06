@@ -32,7 +32,7 @@ export default function BanksView({ data, user, setView, saveRows, deleteRows })
   const isTeacher = user?.role === 'teacher';
 
   // --- Bank List Mode ---
-  const filteredBanks = (data.banks || []).filter(b => 
+  const filteredBanks = (data.question_banks || []).filter(b => 
     b.name.toLowerCase().includes(search.toLowerCase()) || 
     (b.area && b.area.toLowerCase().includes(search.toLowerCase()))
   );

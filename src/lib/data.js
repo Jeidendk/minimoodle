@@ -15,7 +15,7 @@ export const seed = {
     { id: "student-demo", full_name: "Estudiante Demo", email: "estudiante@minimoodle.local", role: "student", cedula: "1234567890", created_at: "2026-05-01T08:00:00.000Z" }
   ],
   students: [],
-  banks: [],
+  question_banks: [],
   courses: [
     {
       id: "matematica",
@@ -199,7 +199,7 @@ export async function loadData() {
     profiles: profiles?.length ? profiles : seed.profiles,
     courses: courses?.length ? courses : seed.courses,
     sections: sections?.length ? sections : seed.sections,
-    banks: banks || [],
+    question_banks: banks || [],
     quizzes: quizzes?.length ? quizzes : seed.quizzes,
     questions: questions?.length ? questions : seed.questions,
     attempts: attempts?.length ? attempts : seed.attempts,
