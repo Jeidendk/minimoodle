@@ -112,7 +112,11 @@ alter table public.quizzes   add column if not exists minutes_per_question integ
 alter table public.quizzes   add column if not exists shuffle_questions boolean not null default true;
 alter table public.quizzes   add column if not exists shuffle_options boolean not null default true;
 alter table public.questions add column if not exists bank_id text references public.question_banks(id) on delete cascade;
+alter table public.attempts  add column if not exists answers jsonb not null default '{}'::jsonb;
 alter table public.attempts  add column if not exists question_ids jsonb not null default '[]'::jsonb;
+alter table public.attempts  add column if not exists score numeric not null default 0;
+alter table public.attempts  add column if not exists total numeric not null default 0;
+alter table public.attempts  add column if not exists student_name text not null default '';
 -- questions.quiz_id must allow NULL for bank-only questions
 alter table public.questions alter column quiz_id drop not null;
 
