@@ -1,36 +1,33 @@
 import React, { useState } from 'react';
-import '../styles.css';
 
 export default function ReportsView({ setView }) {
   const [activeTab, setActiveTab] = useState('rendimiento');
 
   return (
-    <section className="evaluations-view">
+    <section className="courses-dashboard fade-in">
       {/* HEADER ROW */}
-      <div className="eval-header-section" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
-        <div style={{ flexShrink: 0, paddingRight: '1rem' }}>
-          <div className="eval-breadcrumb">ANÁLISIS INSTITUCIONAL</div>
-          <div className="eval-header-text">
-            <h1 style={{ fontSize: '1.8rem' }}>Reportes</h1>
-            <p>Visualiza el progreso general y toma decisiones informadas.</p>
-          </div>
+      <div className="courses-header-section" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+        <div className="courses-header-text">
+          <div className="eyebrow">ANÁLISIS INSTITUCIONAL</div>
+          <h1>Reportes</h1>
+          <p>Visualiza el progreso general y toma decisiones informadas.</p>
         </div>
 
         {/* TOP METRICS IN HEADER */}
-        <div className="eval-top-metrics" style={{ flex: 1, margin: 0, padding: '0.4rem', border: 'none', boxShadow: 'none', background: 'transparent' }}>
-          <div className="eval-top-metric-card" style={{ flex: 1.2, background: 'white', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <div className="eval-metric-icon" style={{ background: '#EFF6FF', color: '#2563EB' }}>
+        <div className="courses-metrics" style={{ flex: 1 }}>
+          <div className="metric-card-small">
+            <div className="eval-metric-icon" style={{ background: '#EFF6FF', color: 'var(--color-primary)' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
             </div>
             <div>
               <span className="eval-metric-label">Promedio Institucional</span>
               <span className="eval-metric-value">8.4 / 10</span>
-              <span className="eval-metric-sub" style={{ color: '#16A34A', fontWeight: 600 }}>↑ 0.2 este semestre</span>
+              <span className="eval-metric-sub" style={{ color: 'var(--color-success)', fontWeight: 600 }}>↑ 0.2 este semestre</span>
             </div>
           </div>
           
-          <div className="eval-top-metric-card" style={{ flex: 1, background: 'white', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <div className="eval-metric-icon" style={{ background: '#ECFDF5', color: '#10B981' }}>
+          <div className="metric-card-small">
+            <div className="eval-metric-icon" style={{ background: '#ECFDF5', color: 'var(--color-success)' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             </div>
             <div>
@@ -40,8 +37,8 @@ export default function ReportsView({ setView }) {
             </div>
           </div>
 
-          <div className="eval-top-metric-card" style={{ flex: 1, background: 'white', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', borderRight: '1px solid var(--color-border)' }}>
-            <div className="eval-metric-icon" style={{ background: '#FFF7ED', color: '#F97316' }}>
+          <div className="metric-card-small">
+            <div className="eval-metric-icon" style={{ background: '#FFF7ED', color: 'var(--color-warning)' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             </div>
             <div>
@@ -65,7 +62,7 @@ export default function ReportsView({ setView }) {
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div className="eval-global-actions">
-                  <button className="eval-btn-outline" style={{ background: 'white' }}>
+                  <button className="eval-btn-outline" style={{ background: 'var(--color-card)' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                     Descargar CSV
                   </button>
@@ -109,25 +106,25 @@ export default function ReportsView({ setView }) {
                     <td className="text-left" style={{ fontWeight: 600 }}>Razonamiento Matemático</td>
                     <td style={{ textAlign: 'center' }}>28</td>
                     <td style={{ textAlign: 'center', fontWeight: 600 }}>8.7</td>
-                    <td style={{ textAlign: 'center', color: '#10B981' }}>82%</td>
-                    <td style={{ textAlign: 'center', color: '#EF4444' }}>11%</td>
-                    <td style={{ textAlign: 'center', color: '#10B981' }}>↑</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-success)' }}>82%</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-danger)' }}>11%</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-success)' }}>↑</td>
                   </tr>
                   <tr>
                     <td className="text-left" style={{ fontWeight: 600 }}>Física Cuántica Básica</td>
                     <td style={{ textAlign: 'center' }}>22</td>
                     <td style={{ textAlign: 'center', fontWeight: 600 }}>7.2</td>
-                    <td style={{ textAlign: 'center', color: '#10B981' }}>65%</td>
-                    <td style={{ textAlign: 'center', color: '#EF4444' }}>25%</td>
-                    <td style={{ textAlign: 'center', color: '#EF4444' }}>↓</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-success)' }}>65%</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-danger)' }}>25%</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-danger)' }}>↓</td>
                   </tr>
                   <tr>
                     <td className="text-left" style={{ fontWeight: 600 }}>Literatura Universal</td>
                     <td style={{ textAlign: 'center' }}>35</td>
                     <td style={{ textAlign: 'center', fontWeight: 600 }}>9.1</td>
-                    <td style={{ textAlign: 'center', color: '#10B981' }}>95%</td>
-                    <td style={{ textAlign: 'center', color: '#EF4444' }}>2%</td>
-                    <td style={{ textAlign: 'center', color: '#10B981' }}>↑</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-success)' }}>95%</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-danger)' }}>2%</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-success)' }}>↑</td>
                   </tr>
                 </tbody>
               </table>
@@ -144,7 +141,7 @@ export default function ReportsView({ setView }) {
             </div>
             <div className="eval-validations">
               <div className="gr-student-card" style={{ border: 'none', marginBottom: 0, paddingBottom: 0 }}>
-                <div style={{ width: '32px', height: '32px', background: '#DCFCE7', color: '#15803D', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>1</div>
+                <div style={{ width: '32px', height: '32px', background: '#DCFCE7', color: 'var(--color-success)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>1</div>
                 <div style={{ flex: 1 }}>
                   <strong>Diego Alejandro Rojas</strong>
                   <span>Promedio: 9.8</span>
@@ -167,7 +164,7 @@ export default function ReportsView({ setView }) {
             <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginBottom: '1rem' }}>Estudiantes con bajo rendimiento sostenido.</p>
             <div className="eval-validations">
               <div className="gr-student-card" style={{ border: 'none', marginBottom: 0, paddingBottom: 0 }}>
-                <div style={{ width: '32px', height: '32px', background: '#FEF2F2', color: '#B91C1C', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>!</div>
+                <div style={{ width: '32px', height: '32px', background: '#FEF2F2', color: 'var(--color-danger)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>!</div>
                 <div style={{ flex: 1 }}>
                   <strong>Juan Sebastián Cruz</strong>
                   <span>Promedio: 5.9</span>

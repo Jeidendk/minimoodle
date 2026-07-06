@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import '../styles.css';
 
 export default function CommunicationView({ setView }) {
   const [activeTab, setActiveTab] = useState('recibidos');
@@ -12,20 +11,18 @@ export default function CommunicationView({ setView }) {
   ];
 
   return (
-    <section className="evaluations-view">
+    <section className="courses-dashboard fade-in">
       {/* HEADER ROW */}
-      <div className="eval-header-section" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
-        <div style={{ flexShrink: 0, paddingRight: '1rem' }}>
-          <div className="eval-breadcrumb">CENTRO DE MENSAJES</div>
-          <div className="eval-header-text">
-            <h1 style={{ fontSize: '1.8rem' }}>Comunicación</h1>
-            <p>Mantente en contacto con estudiantes y administración.</p>
-          </div>
+      <div className="courses-header-section">
+        <div className="courses-header-text">
+          <div className="eyebrow">CENTRO DE MENSAJES</div>
+          <h1>Comunicación</h1>
+          <p>Mantente en contacto con estudiantes y administración.</p>
         </div>
 
-        <div className="eval-top-metrics" style={{ flex: 1, margin: 0, padding: '0.4rem', border: 'none', boxShadow: 'none', background: 'transparent' }}>
-          <div className="eval-top-metric-card" style={{ flex: 1, background: 'white', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-             <div className="eval-metric-icon" style={{ background: '#EFF6FF', color: '#2563EB' }}>
+        <div className="courses-metrics">
+          <div className="metric-card-small">
+             <div className="eval-metric-icon" style={{ background: 'var(--color-bg)', color: 'var(--color-primary)' }}>
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
              </div>
              <div>
@@ -34,8 +31,8 @@ export default function CommunicationView({ setView }) {
                <span className="eval-metric-sub">2 sin leer</span>
              </div>
           </div>
-          <div className="eval-top-metric-card" style={{ flex: 1, background: 'white', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-             <div className="eval-metric-icon" style={{ background: '#ECFDF5', color: '#10B981' }}>
+          <div className="metric-card-small">
+             <div className="eval-metric-icon" style={{ background: '#ECFDF5', color: 'var(--color-success)' }}>
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
              </div>
              <div>
@@ -44,7 +41,6 @@ export default function CommunicationView({ setView }) {
                <span className="eval-metric-sub">Este mes</span>
              </div>
           </div>
-          <div className="eval-top-metric-card" style={{ flex: 1.5, background: 'transparent', border: 'none', boxShadow: 'none' }}></div>
         </div>
       </div>
 
@@ -85,7 +81,7 @@ export default function CommunicationView({ setView }) {
               <table className="grades-table" style={{ cursor: 'pointer' }}>
                 <tbody>
                   {messages.map(msg => (
-                    <tr key={msg.id} style={{ background: msg.unread ? '#F8FAFC' : 'white' }}>
+                    <tr key={msg.id} style={{ background: msg.unread ? 'var(--color-bg)' : 'var(--color-card)' }}>
                       <td style={{ width: '40px', paddingRight: 0 }}>
                          <div style={{ width: '32px', height: '32px', background: 'var(--color-primary)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 600 }}>
                            {msg.sender.charAt(0)}
@@ -100,7 +96,7 @@ export default function CommunicationView({ setView }) {
                       </td>
                       <td className="text-right" style={{ color: 'var(--color-muted)', fontSize: '0.65rem' }}>
                         {msg.time}
-                        {msg.unread && <div style={{ width: '8px', height: '8px', background: '#2563EB', borderRadius: '50%', display: 'inline-block', marginLeft: '0.5rem' }}></div>}
+                        {msg.unread && <div style={{ width: '8px', height: '8px', background: 'var(--color-primary)', borderRadius: '50%', display: 'inline-block', marginLeft: '0.5rem' }}></div>}
                       </td>
                     </tr>
                   ))}
@@ -138,7 +134,7 @@ export default function CommunicationView({ setView }) {
             </div>
             <div className="eval-global-actions" style={{ justifyContent: 'flex-end', marginTop: '1rem' }}>
                <button className="eval-btn-outline">Guardar borrador</button>
-               <button className="eval-btn-primary" style={{ background: '#2563EB' }}>
+               <button className="eval-btn-primary" style={{ background: 'var(--color-primary)' }}>
                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                  Enviar mensaje
                </button>

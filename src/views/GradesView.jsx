@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import '../styles.css';
 
 const gradesData = [
   { id: 1, name: "María Fernanda López", code: "MAT2025001", quiz1: 8.5, tarea1: 9.2, part: 9.0, exam: 8.8, final: 8.86, status: "Aprobado", avatar: "https://i.pravatar.cc/150?img=1" },
@@ -14,22 +13,22 @@ export default function GradesView({ setView }) {
   const [activeTab, setActiveTab] = useState("notas");
 
   return (
-    <section className="evaluations-view">
+    <section className="courses-dashboard fade-in">
       
       {/* HEADER ROW */}
-      <div className="eval-header-section" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+      <div className="courses-header-section" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
         <div style={{ flexShrink: 0, paddingRight: '1rem' }}>
-          <div className="eval-breadcrumb">GESTIÓN DE CALIFICACIONES</div>
-          <div className="eval-header-text">
+          <div className="eyebrow">GESTIÓN DE CALIFICACIONES</div>
+          <div className="courses-header-text">
             <h1 style={{ fontSize: '1.8rem' }}>Calificaciones</h1>
             <p>Administra notas, revisa el progreso y publica resultados por curso.</p>
           </div>
         </div>
         
         {/* TOP METRICS IN HEADER */}
-        <div className="eval-top-metrics" style={{ flex: 1, margin: 0, padding: '0.4rem', border: 'none', boxShadow: 'none', background: 'transparent' }}>
-          <div className="eval-top-metric-card" style={{ flex: 1.5, background: 'white', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <div className="eval-metric-icon" style={{ background: '#EFF6FF', color: '#2563EB' }}>
+        <div className="courses-metrics" style={{ flex: 1, margin: 0, padding: '0.4rem', border: 'none', boxShadow: 'none', background: 'transparent' }}>
+          <div className="metric-card-small" style={{ flex: 1.5 }}>
+            <div className="eval-metric-icon" style={{ background: '#EFF6FF', color: 'var(--color-primary)' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
             </div>
             <div>
@@ -39,8 +38,8 @@ export default function GradesView({ setView }) {
             </div>
           </div>
           
-          <div className="eval-top-metric-card" style={{ flex: 1, background: 'white', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <div className="eval-metric-icon" style={{ background: '#ECFDF5', color: '#10B981' }}>
+          <div className="metric-card-small" style={{ flex: 1 }}>
+            <div className="eval-metric-icon" style={{ background: '#ECFDF5', color: 'var(--color-success)' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
             </div>
             <div>
@@ -50,19 +49,19 @@ export default function GradesView({ setView }) {
             </div>
           </div>
 
-          <div className="eval-top-metric-card" style={{ flex: 1.2, background: 'white', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
-            <div className="eval-metric-icon" style={{ background: '#FFF7ED', color: '#F97316' }}>
+          <div className="metric-card-small" style={{ flex: 1.2 }}>
+            <div className="eval-metric-icon" style={{ background: '#FFF7ED', color: 'var(--color-warning)' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>
             </div>
             <div>
               <span className="eval-metric-label">Promedio general</span>
               <span className="eval-metric-value">8.7 / 10</span>
-              <span className="eval-metric-sub" style={{ color: '#16A34A', fontWeight: 600 }}>↑ 0.6 vs. periodo anterior</span>
+              <span className="eval-metric-sub" style={{ color: 'var(--color-success)', fontWeight: 600 }}>↑ 0.6 vs. periodo anterior</span>
             </div>
           </div>
 
-          <div className="eval-top-metric-card" style={{ flex: 1, background: 'white', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', borderRight: '1px solid var(--color-border)' }}>
-            <div className="eval-metric-icon" style={{ background: '#FEF2F2', color: '#EF4444' }}>
+          <div className="metric-card-small" style={{ flex: 1 }}>
+            <div className="eval-metric-icon" style={{ background: '#FEF2F2', color: 'var(--color-danger)' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             </div>
             <div>
@@ -90,7 +89,7 @@ export default function GradesView({ setView }) {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                     Exportar reporte
                   </button>
-                  <button className="eval-btn-primary" style={{ background: '#2563EB' }}>
+                  <button className="eval-btn-primary" style={{ background: 'var(--color-primary)' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                     Publicar calificaciones
                   </button>
@@ -165,7 +164,7 @@ export default function GradesView({ setView }) {
                       <td className="text-center">{row.tarea1}</td>
                       <td className="text-center">{row.part}</td>
                       <td className="text-center">{row.exam}</td>
-                      <td className="text-center font-bold" style={{ color: row.final >= 7 ? '#2563EB' : '#DC2626' }}>{row.final}</td>
+                      <td className="text-center font-bold" style={{ color: row.final >= 7 ? 'var(--color-primary)' : 'var(--color-danger)' }}>{row.final}</td>
                       <td className="text-center">
                         <div className={`gr-status ${row.status.toLowerCase().replace(' ', '-')}`}>
                           <div className="dot"></div> {row.status}
@@ -204,7 +203,7 @@ export default function GradesView({ setView }) {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                 Guardar cambios
               </button>
-              <button className="eval-btn-primary" style={{ padding: '0.4rem 2rem', background: '#2563EB' }}>
+              <button className="eval-btn-primary" style={{ padding: '0.4rem 2rem', background: 'var(--color-primary)' }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
                 Calcular promedio final
               </button>
@@ -230,17 +229,17 @@ export default function GradesView({ setView }) {
               </div>
               <div className="gr-donut-legend">
                 <div className="gr-legend-item">
-                  <div className="gr-legend-dot" style={{ background: '#10B981' }}></div>
+                  <div className="gr-legend-dot" style={{ background: 'var(--color-success)' }}></div>
                   <span className="gr-legend-label">Aprobados</span>
                   <span className="gr-legend-val">82% (23)</span>
                 </div>
                 <div className="gr-legend-item">
-                  <div className="gr-legend-dot" style={{ background: '#F59E0B' }}></div>
+                  <div className="gr-legend-dot" style={{ background: 'var(--color-warning)' }}></div>
                   <span className="gr-legend-label">En riesgo</span>
                   <span className="gr-legend-val">11% (3)</span>
                 </div>
                 <div className="gr-legend-item">
-                  <div className="gr-legend-dot" style={{ background: '#EF4444' }}></div>
+                  <div className="gr-legend-dot" style={{ background: 'var(--color-danger)' }}></div>
                   <span className="gr-legend-label">Pendientes</span>
                   <span className="gr-legend-val">7% (2)</span>
                 </div>
@@ -314,7 +313,7 @@ export default function GradesView({ setView }) {
             </div>
             <div className="eval-validations">
               <div className="eval-val-item">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="16 10 12 14 8 10"></polyline></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="16 10 12 14 8 10"></polyline></svg>
                 24 estudiantes con nota final
               </div>
               <div className="eval-val-item">
