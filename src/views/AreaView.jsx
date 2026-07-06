@@ -6,8 +6,19 @@ export default function AreaView({ data, user, goCourse, goQuiz }) {
   const publishedQuizzes = data.quizzes.filter((quiz) => quiz.published);
   const completedQuizIds = new Set(data.attempts.filter((attempt) => attempt.student_id === user.id).map((attempt) => attempt.quiz_id));
   const nextQuiz = publishedQuizzes.find((quiz) => !completedQuizIds.has(quiz.id));
-  
+
   const isTeacher = user?.role === 'teacher';
+
+  // Real metrics derived from data
+  const students = data.students || [];
+  const coursesCount = data.courses.length;
+  const pendingEvals = data.quizzes.filter((q) => !q.published).length;
+  const attempts = data.attempts || [];
+  const avgProgress = attempts.length
+    ? Math.round(attempts.reduce((sum, a) => sum + (a.total ? (Number(a.score) / Number(a.total)) * 100 : 0), 0) / attempts.length)
+    : 0;
+  const activeStudents = students.filter((s) => (s.status || 'Activo') === 'Activo').length;
+  const totalStudents = students.length;
 
   return (
     <section className="dashboard-teacher fade-in">
@@ -36,7 +47,7 @@ export default function AreaView({ data, user, goCourse, goQuiz }) {
              </div>
              <div className="metric-info" style={{ flex: 1 }}>
                <h4 style={{ fontSize: '0.7rem', color: '#64748b', margin: '0 0 0.25rem 0', fontWeight: '600' }}>Cursos inscritos</h4>
-               <div className="metric-value" style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', lineHeight: '1' }}>{data.courses.length || 4}</div>
+               <div className="metric-value" style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', lineHeight: '1' }}>{coursesCount}</div>
              </div>
           </div>
           
@@ -52,8 +63,8 @@ export default function AreaView({ data, user, goCourse, goQuiz }) {
                </div>
                <div className="metric-info" style={{ flex: 1 }}>
                  <h4 style={{ fontSize: '0.7rem', color: '#64748b', margin: '0 0 0.25rem 0', fontWeight: '600' }}>Evaluaciones</h4>
-                 <div className="metric-value" style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', lineHeight: '1' }}>7</div>
-                 <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem', margin: 0 }}>Por calificar</p>
+                 <div className="metric-value" style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', lineHeight: '1' }}>{pendingEvals}</div>
+                 <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem', margin: 0 }}>Borradores por publicar</p>
                </div>
             </div>
           )}
@@ -68,7 +79,7 @@ export default function AreaView({ data, user, goCourse, goQuiz }) {
              </div>
              <div className="metric-info" style={{ flex: 1 }}>
                <h4 style={{ fontSize: '0.7rem', color: '#64748b', margin: '0 0 0.25rem 0', fontWeight: '600' }}>Progreso general</h4>
-               <div className="metric-value" style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', lineHeight: '1' }}>68%</div>
+               <div className="metric-value" style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', lineHeight: '1' }}>{avgProgress}%</div>
              </div>
           </div>
           
@@ -85,7 +96,8 @@ export default function AreaView({ data, user, goCourse, goQuiz }) {
                </div>
                <div className="metric-info" style={{ flex: 1 }}>
                  <h4 style={{ fontSize: '0.7rem', color: '#64748b', margin: '0 0 0.25rem 0', fontWeight: '600' }}>Estudiantes activos</h4>
-                 <div className="metric-value" style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', lineHeight: '1' }}>86</div>
+                 <div className="metric-value" style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A', lineHeight: '1' }}>{activeStudents}</div>
+                 <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem', margin: 0 }}>De {totalStudents} registrados</p>
                </div>
             </div>
           )}

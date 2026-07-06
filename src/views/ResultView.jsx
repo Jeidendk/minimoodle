@@ -6,8 +6,12 @@ export default function ResultView({ data, quiz, user, setView }) {
   const attempt = data.attempts
     .filter((item) => item.quiz_id === quiz.id && item.student_id === user.id)
     .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))[0];
-    
-  const questions = data.questions.filter((question) => question.quiz_id === quiz.id);
+
+  // Use the exact questions the student saw (bank draws differ per attempt).
+  const attemptIds = attempt?.question_ids;
+  const questions = (Array.isArray(attemptIds) && attemptIds.length)
+    ? attemptIds.map((id) => data.questions.find((q) => q.id === id)).filter(Boolean)
+    : data.questions.filter((question) => question.quiz_id === quiz.id);
   const percent = attempt ? Math.round((attempt.score / Math.max(attempt.total, 1)) * 100) : 0;
   
   const isPassed = percent >= 70;
@@ -64,11 +68,42 @@ export default function ResultView({ data, quiz, user, setView }) {
                   <strong>Pregunta {index + 1}</strong>
                 </div>
                 <p className="feedback-prompt">{question.prompt}</p>
-                
-                <div className="feedback-explanation">
-                  <div className="explanation-title">Explicación del docente:</div>
-                  <p>{question.explanation}</p>
+
+                <div className="feedback-options">
+                  {question.options.map((opt, i) => {
+                    const isCorrect = i === Number(question.answer_index);
+                    const isChosen = i === selected;
+                    let cls = 'review-opt';
+                    if (isCorrect) cls += ' correct';
+                    else if (isChosen) cls += ' chosen-wrong';
+                    return (
+                      <div className={cls} key={i}>
+                        <span className="review-opt-letter">{String.fromCharCode(65 + i)}</span>
+                        <span className="review-opt-text">{opt}</span>
+                        {isCorrect && (
+                          <span className="review-opt-tag correct-tag">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Correcta
+                          </span>
+                        )}
+                        {isChosen && !isCorrect && (
+                          <span className="review-opt-tag wrong-tag">Tu respuesta</span>
+                        )}
+                        {isChosen && isCorrect && (
+                          <span className="review-opt-tag your-tag">Tu respuesta</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {isNaN(selected) && <p className="review-unanswered">No respondiste esta pregunta.</p>}
                 </div>
+
+                {question.explanation && (
+                  <div className="feedback-explanation">
+                    <div className="explanation-title">Explicación del docente:</div>
+                    <p>{question.explanation}</p>
+                  </div>
+                )}
               </article>
             );
           })}

@@ -123,16 +123,23 @@ function App() {
     });
   }
 
+  function removeLocal(table, idList) {
+    setData((current) => ({
+      ...current,
+      [table]: (current[table] || []).filter((item) => !idList.includes(item.id))
+    }));
+  }
+
   async function saveRows(table, rows) {
     const list = Array.isArray(rows) ? rows : [rows];
     if (!list.length) return;
-    if (!supabase) {
-      upsertLocal(table, list);
-      return;
-    }
+    // Optimistic local update first so the UI always reflects the change.
+    upsertLocal(table, list);
+    if (!supabase) return;
     const { error: saveError } = await supabase.from(table).upsert(list);
     if (saveError) {
-      setError(saveError.message);
+      // DB not migrated / table missing: keep the local change, just warn.
+      console.warn(`[minimoodle] no se pudo guardar en "${table}":`, saveError.message);
       return;
     }
     setData(await loadData());
@@ -141,23 +148,23 @@ function App() {
   async function deleteRows(table, ids) {
     const idList = Array.isArray(ids) ? ids : [ids];
     if (!idList.length) return;
-    if (!supabase) {
-      setData((current) => ({
-        ...current,
-        [table]: current[table].filter((item) => !idList.includes(item.id))
-      }));
-      return;
-    }
+    removeLocal(table, idList);
+    if (!supabase) return;
     const { error: delError } = await supabase.from(table).delete().in('id', idList);
     if (delError) {
-      setError(delError.message);
+      console.warn(`[minimoodle] no se pudo eliminar en "${table}":`, delError.message);
       return;
     }
     setData(await loadData());
   }
 
-  async function submitAttempt(answers) {
-    const quizQuestions = data.questions.filter((question) => question.quiz_id === selectedQuiz.id);
+  async function submitAttempt(answers, questionIds) {
+    // Score against the exact question set the student saw (works for bank draws + shuffles).
+    const ids = Array.isArray(questionIds) && questionIds.length
+      ? questionIds
+      : data.questions.filter((q) => q.quiz_id === selectedQuiz.id).map((q) => q.id);
+    const idSet = new Set(ids);
+    const quizQuestions = data.questions.filter((question) => idSet.has(question.id));
     const total = quizQuestions.reduce((sum, question) => sum + Number(question.points || 1), 0);
     const score = quizQuestions.reduce((sum, question) => {
       return sum + (Number(answers[question.id]) === Number(question.answer_index) ? Number(question.points || 1) : 0);
@@ -168,16 +175,16 @@ function App() {
       student_id: user.id,
       student_name: user.full_name,
       answers,
+      question_ids: ids,
       score,
       total,
       submitted_at: new Date().toISOString()
     };
-    if (!supabase) {
-      setData((current) => ({ ...current, attempts: [attempt, ...current.attempts] }));
-    } else {
+    setData((current) => ({ ...current, attempts: [attempt, ...current.attempts] }));
+    if (supabase) {
       const { error: attemptError } = await supabase.from("attempts").insert(attempt);
-      if (attemptError) setError(attemptError.message);
-      setData(await loadData());
+      if (attemptError) console.warn('[minimoodle] no se pudo guardar intento:', attemptError.message);
+      else setData(await loadData());
     }
     setView("result");
   }
@@ -244,11 +251,11 @@ function App() {
             />
           )}
           {view === "course" && <CourseView data={data} course={selectedCourse} user={user} goQuiz={goQuiz} setView={setView} saveRows={saveRows} deleteRows={deleteRows} />}
-          {view === "quiz" && <QuizView data={data} quiz={selectedQuiz} submitAttempt={submitAttempt} setView={setView} />}
+          {view === "quiz" && <QuizView data={data} quiz={selectedQuiz} user={user} submitAttempt={submitAttempt} setView={setView} />}
           {view === "result" && <ResultView data={data} quiz={selectedQuiz} user={user} setView={setView} />}
           {view === "teacher" && <EvaluationsView data={data} user={user} setView={setView} saveRows={saveRows} goCourse={goCourse} />}
           {view === "grades" && <GradesView setView={setView} />}
-          {view === "students" && <StudentsView data={data} user={user} setView={setView} />}
+          {view === "students" && <StudentsView data={data} user={user} setView={setView} saveRows={saveRows} deleteRows={deleteRows} />}
           {view === "attempts" && <AttemptsView data={data} setView={setView} />}
           {view === "communication" && <CommunicationView setView={setView} />}
           {view === "reports" && <ReportsView setView={setView} />}

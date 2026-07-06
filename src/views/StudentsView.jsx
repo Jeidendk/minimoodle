@@ -1,37 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
-
-const INITIAL_STUDENTS = [
-  {
-    id: 's1', initials: 'AM', color: '#8B5CF6', name: 'Andrés Morales',
-    cedula: '1754325678', email: 'andres.morales@email.com',
-    courses: [{ label: 'Matemáticas Básicas', color: 'purple' }],
-    code: 'A7K9-2P3L', status: 'Activo', date: '12/06/2024', time: '10:30 a. m.'
-  },
-  {
-    id: 's2', initials: 'VM', color: '#EC4899', name: 'Valeria Martínez',
-    cedula: '1754987654', email: 'valeria.martinez@email.com',
-    courses: [{ label: 'Comprensión Lectora', color: 'pink' }, { label: 'Estudios Sociales', color: 'teal' }],
-    code: 'B2X8-7N1M', status: 'Activo', date: '11/06/2024', time: '04:15 p. m.'
-  },
-  {
-    id: 's3', initials: 'JR', color: '#F59E0B', name: 'Juan Rodríguez',
-    cedula: '1756678890', email: 'juan.rodriguez@email.com',
-    courses: [{ label: 'Ciencias Naturales', color: 'yellow' }],
-    code: 'C5D1-9K7H', status: 'Activo', date: '10/06/2024', time: '09:20 a. m.'
-  },
-  {
-    id: 's4', initials: 'LM', color: '#06B6D4', name: 'Laura Mendoza',
-    cedula: '1755564321', email: 'laura.mendoza@email.com',
-    courses: [{ label: 'Razonamiento Matemático', color: 'blue' }, { label: 'Comprensión Lectora', color: 'pink' }],
-    code: 'D8Q3-6Z2P', status: 'Pendiente', date: '09/06/2024', time: '02:45 p. m.'
-  },
-  {
-    id: 's5', initials: 'SF', color: '#22C55E', name: 'Sofía Fernández',
-    cedula: '1753456789', email: 'sofia.fernandez@email.com',
-    courses: [{ label: 'Estudios Sociales', color: 'teal' }],
-    code: 'E4M7-1B9N', status: 'Activo', date: '08/06/2024', time: '11:05 a. m.'
-  },
-];
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 
 const COURSE_COLORS = {
   'Matemáticas Básicas': 'purple',
@@ -42,19 +9,15 @@ const COURSE_COLORS = {
 };
 
 const COURSE_LIST = Object.keys(COURSE_COLORS);
-const STORAGE_KEY = 'minimoodle:students';
 
-function loadStudents() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return INITIAL_STUDENTS;
-}
-
-function saveStudents(list) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
-}
+// Seed rows in DB shape (used to auto-populate the students table on first run).
+const SEED_ROWS = [
+  { id: 's1', initials: 'AM', color: '#8B5CF6', full_name: 'Andrés Morales', cedula: '1754325678', email: 'andres.morales@email.com', courses: [{ label: 'Matemáticas Básicas', color: 'purple' }], code: 'A7K9-2P3L', status: 'Activo', registered_at: '2024-06-12T10:30:00.000Z' },
+  { id: 's2', initials: 'VM', color: '#EC4899', full_name: 'Valeria Martínez', cedula: '1754987654', email: 'valeria.martinez@email.com', courses: [{ label: 'Comprensión Lectora', color: 'pink' }, { label: 'Estudios Sociales', color: 'teal' }], code: 'B2X8-7N1M', status: 'Activo', registered_at: '2024-06-11T16:15:00.000Z' },
+  { id: 's3', initials: 'JR', color: '#F59E0B', full_name: 'Juan Rodríguez', cedula: '1756678890', email: 'juan.rodriguez@email.com', courses: [{ label: 'Ciencias Naturales', color: 'yellow' }], code: 'C5D1-9K7H', status: 'Activo', registered_at: '2024-06-10T09:20:00.000Z' },
+  { id: 's4', initials: 'LM', color: '#06B6D4', full_name: 'Laura Mendoza', cedula: '1755564321', email: 'laura.mendoza@email.com', courses: [{ label: 'Razonamiento Matemático', color: 'blue' }, { label: 'Comprensión Lectora', color: 'pink' }], code: 'D8Q3-6Z2P', status: 'Pendiente', registered_at: '2024-06-09T14:45:00.000Z' },
+  { id: 's5', initials: 'SF', color: '#22C55E', full_name: 'Sofía Fernández', cedula: '1753456789', email: 'sofia.fernandez@email.com', courses: [{ label: 'Estudios Sociales', color: 'teal' }], code: 'E4M7-1B9N', status: 'Activo', registered_at: '2024-06-08T11:05:00.000Z' },
+];
 
 function initialsOf(name) {
   const parts = name.trim().split(/\s+/);
@@ -72,8 +35,9 @@ function generateCode() {
   return `${rand(4)}-${rand(4)}`;
 }
 
-function nowStamp() {
-  const d = new Date();
+function fmtStamp(iso) {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d)) return { date: '', time: '' };
   const pad = (n) => String(n).padStart(2, '0');
   return {
     date: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`,
@@ -81,9 +45,41 @@ function nowStamp() {
   };
 }
 
-export default function StudentsView({ data, user, setView }) {
+// DB row -> UI view model
+function toView(row) {
+  return {
+    id: row.id,
+    name: row.full_name,
+    cedula: row.cedula || '',
+    email: row.email || '',
+    courses: Array.isArray(row.courses) ? row.courses : [],
+    code: row.code || '',
+    status: row.status || 'Pendiente',
+    color: row.color || '#8B5CF6',
+    initials: row.initials || initialsOf(row.full_name || '?'),
+    registered_at: row.registered_at,
+    ...fmtStamp(row.registered_at),
+  };
+}
+
+// UI view model -> DB row
+function toRow(v) {
+  return {
+    id: v.id,
+    full_name: v.name,
+    cedula: v.cedula,
+    email: v.email,
+    courses: v.courses,
+    code: v.code,
+    status: v.status,
+    color: v.color,
+    initials: v.initials || initialsOf(v.name || '?'),
+    registered_at: v.registered_at || new Date().toISOString(),
+  };
+}
+
+export default function StudentsView({ data, user, setView, saveRows, deleteRows }) {
   const [tab, setTab] = useState('students');
-  const [students, setStudents] = useState(loadStudents);
   const [search, setSearch] = useState('');
   const [courseFilter, setCourseFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -95,8 +91,23 @@ export default function StudentsView({ data, user, setView }) {
   const [toast, setToast] = useState(null);
   const [page, setPage] = useState(1);
   const perPage = 5;
+  const seededRef = useRef(false);
 
-  useEffect(() => { saveStudents(students); }, [students]);
+  const dbStudents = data.students || [];
+
+  // Auto-seed the students table on first run so the demo has content.
+  useEffect(() => {
+    if (!dbStudents.length && !seededRef.current && saveRows) {
+      seededRef.current = true;
+      saveRows('students', SEED_ROWS);
+    }
+  }, [dbStudents.length, saveRows]);
+
+  const students = useMemo(
+    () => (dbStudents.length ? dbStudents.map(toView) : SEED_ROWS.map(toView)),
+    [dbStudents]
+  );
+
   useEffect(() => {
     const handler = () => setOpenMenu(null);
     document.addEventListener('click', handler);
@@ -119,6 +130,7 @@ export default function StudentsView({ data, user, setView }) {
   useEffect(() => { setPage(1); }, [search, statusFilter, courseFilter]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
+  const persist = (row) => { if (saveRows) saveRows('students', row); };
 
   const copyCode = (id, code) => {
     if (navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {});
@@ -128,52 +140,53 @@ export default function StudentsView({ data, user, setView }) {
   };
 
   const regenerateCode = (id) => {
-    setStudents((prev) => prev.map(s => s.id === id ? { ...s, code: generateCode() } : s));
+    const s = students.find(x => x.id === id);
+    if (s) persist({ ...toRow(s), code: generateCode() });
     showToast('Código regenerado');
     setOpenMenu(null);
   };
 
   const toggleStatus = (id) => {
-    setStudents((prev) => prev.map(s => s.id === id ? { ...s, status: s.status === 'Activo' ? 'Pendiente' : 'Activo' } : s));
+    const s = students.find(x => x.id === id);
+    if (s) persist({ ...toRow(s), status: s.status === 'Activo' ? 'Pendiente' : 'Activo' });
     setOpenMenu(null);
   };
 
   const removeStudent = (id) => {
     if (!confirm('¿Eliminar estudiante? Esta acción no se puede deshacer.')) return;
-    setStudents((prev) => prev.filter(s => s.id !== id));
+    if (deleteRows) deleteRows('students', id);
     showToast('Estudiante eliminado');
     setOpenMenu(null);
   };
 
   const inviteStudent = (payload) => {
-    const stamp = nowStamp();
-    const newStudent = {
+    const row = {
       id: `s${Date.now()}`,
       initials: initialsOf(payload.name),
       color: randomColor(),
-      name: payload.name,
+      full_name: payload.name,
       cedula: payload.cedula,
       email: payload.email,
       courses: payload.courses.map(label => ({ label, color: COURSE_COLORS[label] || 'purple' })),
       code: generateCode(),
       status: 'Pendiente',
-      date: stamp.date,
-      time: stamp.time,
+      registered_at: new Date().toISOString(),
     };
-    setStudents((prev) => [newStudent, ...prev]);
+    persist(row);
     setInviteOpen(false);
     showToast(`Invitación enviada a ${payload.name}`);
   };
 
   const saveEdit = (payload) => {
-    setStudents((prev) => prev.map(s => s.id === payload.id ? {
-      ...s,
-      name: payload.name,
+    const s = students.find(x => x.id === payload.id);
+    if (s) persist({
+      ...toRow(s),
+      full_name: payload.name,
       cedula: payload.cedula,
       email: payload.email,
       initials: initialsOf(payload.name),
       courses: payload.courses.map(label => ({ label, color: COURSE_COLORS[label] || 'purple' })),
-    } : s));
+    });
     setEditStudent(null);
     showToast('Estudiante actualizado');
   };

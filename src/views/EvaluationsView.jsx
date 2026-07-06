@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { uid } from '../lib/data';
+import { uid, uploadImage } from '../lib/data';
 
 const TYPES = ['Cuestionario', 'Examen', 'Práctica'];
 const ANSWER_TYPES = ['Opción múltiple', 'Verdadero/Falso', 'Respuesta corta'];
@@ -14,10 +14,17 @@ const DEFAULT_CONFIG = {
   opensAt: '26/05/2025 08:00',
   closesAt: '02/06/2025 23:59',
   timeLimit: '25 min',
-  randomize: true,
   showResults: true,
   allowRetry: false,
   status: 'Borrador',
+  // Question source
+  origen: 'own',            // 'own' = preguntas propias | 'bank' = sortear de banco global
+  bankId: '',               // existing bank id when origen === 'bank'
+  bankName: '',             // name for a new bank
+  questionCount: 10,        // how many to draw per attempt (bank mode)
+  minutesPerQuestion: 1,    // 1 min per question
+  shuffleQuestions: true,   // random order of questions per attempt
+  shuffleOptions: true,     // random order of options per attempt
 };
 
 const DEFAULT_QUESTION = () => ({
@@ -284,24 +291,51 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
     }
     if (!config.title.trim()) { showToast('Falta título de la evaluación'); return; }
     if (!config.courseId) { showToast('Selecciona un curso primero'); return; }
-    
+
+    const isBank = config.origen === 'bank';
+    let bankId = null;
+
+    if (isBank) {
+      const count = Number(config.questionCount) || 0;
+      if (count < 1) { showToast('Indica cuántas preguntas se sortearán'); return; }
+      if (count > questions.length) { showToast(`El banco tiene ${questions.length} preguntas; no puedes sortear ${count}`); return; }
+      // Resolve or create the bank
+      bankId = config.bankId || uid('bank');
+      if (!config.bankId) {
+        const name = config.bankName.trim() || `Banco ${config.title.trim()}`;
+        saveRows && saveRows('question_banks', {
+          id: bankId, name, description: '', created_at: new Date().toISOString()
+        });
+      }
+    }
+
     const quizId = uid('quiz');
+    const mpq = Number(config.minutesPerQuestion) || 1;
+    const drawCount = isBank ? (Number(config.questionCount) || questions.length) : questions.length;
+
     const newQuiz = {
       id: quizId,
       course_id: config.courseId,
       section_id: config.sectionId,
       title: config.title.trim(),
-      instructions: `Evaluación de tipo: ${config.type}. ${config.timeLimit ? `Tiempo límite: ${config.timeLimit}.` : ''}`,
-      opens_at: new Date().toISOString(), // In real app, parse config.opensAt
-      closes_at: "2026-12-31T23:59:00.000Z", // In real app, parse config.closesAt
-      time_limit_minutes: parseInt(config.timeLimit) || 0,
+      instructions: `Evaluación de tipo: ${config.type}.`,
+      opens_at: new Date().toISOString(),
+      closes_at: "2026-12-31T23:59:00.000Z",
+      time_limit_minutes: Math.max(1, drawCount * mpq),
+      bank_id: isBank ? bankId : null,
+      question_count: isBank ? drawCount : 0,
+      minutes_per_question: mpq,
+      shuffle_questions: config.shuffleQuestions !== false,
+      shuffle_options: config.shuffleOptions !== false,
       published: true,
       created_at: new Date().toISOString()
     };
-    
-    const newQuestions = questions.map(q => ({
-      id: uid('q'),
-      quiz_id: quizId,
+
+    const newQuestions = questions.map((q, i) => ({
+      // Reuse existing bank question ids so re-publishing the same bank upserts
+      id: (isBank && q.dbId) ? q.dbId : uid('q'),
+      quiz_id: isBank ? null : quizId,
+      bank_id: isBank ? bankId : null,
       prompt: q.statement,
       options: q.options,
       answer_index: q.correctIndex,
@@ -310,33 +344,62 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
       image: q.image || null,
       created_at: new Date().toISOString()
     }));
-    
+
     if (saveRows) {
       saveRows('quizzes', newQuiz);
       saveRows('questions', newQuestions);
     }
-    
+
     updateConfig({ status: 'Publicada' });
-    showToast(`✓ Evaluación "${config.title}" publicada`);
-    
-    // Reset state after publish
-    // Reset state after publish
+    showToast(isBank
+      ? `✓ Simulador "${config.title}" publicado (sortea ${drawCount} del banco)`
+      : `✓ Evaluación "${config.title}" publicada`);
+
     setTimeout(() => {
-      // Just redirect straight to the course to avoid blocking `window.confirm` errors
-      if (goCourse) {
-        goCourse(config.courseId);
-      } else {
-        setView('courses');
-      }
+      if (goCourse) goCourse(config.courseId);
+      else setView('courses');
     }, 1500);
   };
 
-  const handleImageUpload = (file) => {
+  // Load an existing bank's questions into the builder (for reuse/editing)
+  const loadBank = (bankId) => {
+    if (!bankId) { updateConfig({ bankId: '', bankName: '' }); return; }
+    const bankQs = (data.questions || []).filter(q => q.bank_id === bankId);
+    if (bankQs.length) {
+      setQuestions(bankQs.map(q => ({
+        id: `q_${q.id}`,
+        dbId: q.id,
+        statement: q.prompt,
+        image: q.image || '',
+        answerType: 'Opción múltiple',
+        difficulty: 'Media',
+        points: q.points || 4,
+        options: Array.isArray(q.options) ? q.options : [],
+        correctIndex: Number(q.answer_index ?? -1),
+        feedback: q.explanation || '',
+      })));
+      setActiveIdx(0);
+    }
+    updateConfig({ bankId, bankName: '' });
+    showToast(`Banco cargado (${bankQs.length} preguntas)`);
+  };
+
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (file) => {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { showToast('Imagen supera 5 MB'); return; }
-    const reader = new FileReader();
-    reader.onload = (ev) => updateActive({ image: ev.target.result });
-    reader.readAsDataURL(file);
+    setUploading(true);
+    showToast('Subiendo imagen...');
+    try {
+      const { url } = await uploadImage(file, 'questions');
+      updateActive({ image: url });
+      showToast(url.startsWith('data:') ? 'Imagen lista (local, webp)' : '✓ Imagen subida (webp)');
+    } catch (err) {
+      showToast('No se pudo subir la imagen');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const removeImage = () => updateActive({ image: '' });
@@ -548,17 +611,65 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
                 </div>
               </div>
               <div className="eval-form-group">
-                <label>Tiempo límite</label>
+                <label>Minutos por pregunta</label>
                 <div className="eval-input-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                  <input type="text" className="eval-input" value={config.timeLimit} onChange={(e) => updateConfig({ timeLimit: e.target.value })} />
+                  <input type="number" min="1" className="eval-input" value={config.minutesPerQuestion} onChange={(e) => updateConfig({ minutesPerQuestion: Number(e.target.value) || 1 })} />
                 </div>
               </div>
-              <div className="eval-form-group empty"></div>
+              <div className="eval-form-group">
+                <label>Tiempo total (automático)</label>
+                <div className="eval-input-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <input type="text" className="eval-input" readOnly value={`${Math.max(1, (config.origen === 'bank' ? (Number(config.questionCount) || 0) : questions.length) * (Number(config.minutesPerQuestion) || 1))} min`} />
+                </div>
+              </div>
+
+              <div className="eval-form-group">
+                <label>Origen de preguntas</label>
+                <div className="eval-select-wrapper">
+                  <select value={config.origen} onChange={(e) => updateConfig({ origen: e.target.value })}>
+                    <option value="own">Preguntas de esta evaluación</option>
+                    <option value="bank">Sortear de un banco global</option>
+                  </select>
+                </div>
+              </div>
+
+              {config.origen === 'bank' ? (
+                <div className="eval-form-group">
+                  <label>Banco de preguntas</label>
+                  <div className="eval-select-wrapper">
+                    <select value={config.bankId} onChange={(e) => loadBank(e.target.value)}>
+                      <option value="">➕ Nuevo banco…</option>
+                      {(data.banks || []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              ) : <div className="eval-form-group empty"></div>}
+
+              {config.origen === 'bank' && !config.bankId && (
+                <div className="eval-form-group">
+                  <label>Nombre del nuevo banco</label>
+                  <input type="text" className="eval-input" value={config.bankName} placeholder="Ej. Banco Matemática 3ro BGU" onChange={(e) => updateConfig({ bankName: e.target.value })} />
+                </div>
+              )}
+              {config.origen === 'bank' && (
+                <div className="eval-form-group">
+                  <label>Preguntas a sortear por intento</label>
+                  <input type="number" min="1" max={questions.length} className="eval-input" value={config.questionCount} onChange={(e) => updateConfig({ questionCount: Number(e.target.value) || 1 })} />
+                  <small style={{ color: 'var(--color-muted)', fontSize: '0.7rem', marginTop: '0.25rem', display: 'block' }}>Banco actual: {questions.length} preguntas · cada estudiante recibe {Math.min(Number(config.questionCount) || 0, questions.length)} al azar</small>
+                </div>
+              )}
 
               <div className="eval-form-group toggle-group">
-                <span>Aleatorizar preguntas</span>
-                <button type="button" className={`eval-toggle ${config.randomize ? 'checked' : ''}`} onClick={() => updateConfig({ randomize: !config.randomize })}>
+                <span>Mezclar preguntas (orden aleatorio)</span>
+                <button type="button" className={`eval-toggle ${config.shuffleQuestions ? 'checked' : ''}`} onClick={() => updateConfig({ shuffleQuestions: !config.shuffleQuestions })}>
+                  <div className="eval-toggle-knob"></div>
+                </button>
+              </div>
+              <div className="eval-form-group toggle-group">
+                <span>Mezclar opciones de cada pregunta</span>
+                <button type="button" className={`eval-toggle ${config.shuffleOptions ? 'checked' : ''}`} onClick={() => updateConfig({ shuffleOptions: !config.shuffleOptions })}>
                   <div className="eval-toggle-knob"></div>
                 </button>
               </div>
@@ -642,8 +753,13 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
 
                       <div className="eval-form-group flex-1">
                         <label>Imagen de la pregunta (opcional)</label>
-                        <div className="eval-image-upload" onClick={() => imageInputRef.current?.click()} style={{ cursor: 'pointer' }}>
-                          {activeQ.image ? (
+                        <div className="eval-image-upload" onClick={() => !uploading && imageInputRef.current?.click()} style={{ cursor: uploading ? 'wait' : 'pointer' }}>
+                          {uploading ? (
+                            <div className="eval-upload-text">
+                              <div className="loader" style={{ width: 22, height: 22, margin: '0 auto 0.4rem' }}></div>
+                              <strong>Convirtiendo a webp y subiendo...</strong>
+                            </div>
+                          ) : activeQ.image ? (
                             <div className="eval-image-preview">
                               <img src={activeQ.image} alt="preview" />
                               <button className="remove-img" onClick={(e) => { e.stopPropagation(); removeImage(); }}>
@@ -653,7 +769,7 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
                           ) : (
                             <div className="eval-upload-text">
                               <strong>Arrastra o sube una imagen para la pregunta</strong>
-                              <p>PNG, JPG o GIF (máx. 5 MB)</p>
+                              <p>Se convierte a WebP automáticamente (máx. 5 MB)</p>
                             </div>
                           )}
                         </div>

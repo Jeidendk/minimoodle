@@ -11,9 +11,11 @@ export const supabase = hasSupabase ? createClient(config.supabaseUrl, config.su
 
 export const seed = {
   profiles: [
-    { id: "teacher-demo", full_name: "Docente Demo", email: "docente@minimoodle.local", role: "teacher", cedula: "1996202530" },
-    { id: "student-demo", full_name: "Estudiante Demo", email: "estudiante@minimoodle.local", role: "student", cedula: "1234567890" }
+    { id: "teacher-demo", full_name: "Docente Demo", email: "docente@minimoodle.local", role: "teacher", cedula: "1996202530", created_at: "2026-05-01T08:00:00.000Z" },
+    { id: "student-demo", full_name: "Estudiante Demo", email: "estudiante@minimoodle.local", role: "student", cedula: "1234567890", created_at: "2026-05-01T08:00:00.000Z" }
   ],
+  students: [],
+  banks: [],
   courses: [
     {
       id: "matematica",
@@ -149,7 +151,10 @@ export function uid(prefix) {
 
 export function readLocalState() {
   const saved = localStorage.getItem(storageKey);
-  return saved ? JSON.parse(saved) : structuredClone(seed);
+  if (!saved) return structuredClone(seed);
+  const parsed = JSON.parse(saved);
+  // Merge in any tables added after this state was first written.
+  return { ...structuredClone(seed), ...parsed, students: parsed.students || [], banks: parsed.banks || [] };
 }
 
 export function writeLocalState(next) {
@@ -160,25 +165,118 @@ export function profilesToPlain(rows) {
   return rows.map((row) => ({ ...row }));
 }
 
+// Fetch one table; tolerate missing table / errors so a partially-migrated
+// database never blocks the whole app (avoids "Invalid path specified").
+async function safeSelect(table, orderCol, opts = {}) {
+  try {
+    let query = supabase.from(table).select("*");
+    if (orderCol) query = query.order(orderCol, opts);
+    const { data, error } = await query;
+    if (error) {
+      console.warn(`[minimoodle] tabla "${table}" no disponible:`, error.message);
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.warn(`[minimoodle] error leyendo "${table}":`, err?.message || err);
+    return null;
+  }
+}
+
 export async function loadData() {
   if (!supabase) return readLocalState();
-  const [profiles, courses, sections, quizzes, questions, attempts] = await Promise.all([
-    supabase.from("profiles").select("*").order("created_at"),
-    supabase.from("courses").select("*").order("created_at"),
-    supabase.from("sections").select("*").order("order"),
-    supabase.from("quizzes").select("*").order("created_at"),
-    supabase.from("questions").select("*").order("created_at"),
-    supabase.from("attempts").select("*").order("submitted_at", { ascending: false })
+  const [profiles, courses, sections, banks, quizzes, questions, attempts, students] = await Promise.all([
+    safeSelect("profiles", "created_at"),
+    safeSelect("courses", "created_at"),
+    safeSelect("sections", "order"),
+    safeSelect("question_banks", "created_at"),
+    safeSelect("quizzes", "created_at"),
+    safeSelect("questions", "created_at"),
+    safeSelect("attempts", "submitted_at", { ascending: false }),
+    safeSelect("students", "registered_at", { ascending: false })
   ]);
-  for (const result of [profiles, courses, sections, quizzes, questions, attempts]) {
-    if (result.error) throw result.error;
-  }
   return {
-    profiles: profiles.data.length ? profiles.data : seed.profiles,
-    courses: courses.data.length ? courses.data : seed.courses,
-    sections: sections.data.length ? sections.data : seed.sections,
-    quizzes: quizzes.data.length ? quizzes.data : seed.quizzes,
-    questions: questions.data.length ? questions.data : seed.questions,
-    attempts: attempts.data.length ? attempts.data : seed.attempts
+    profiles: profiles?.length ? profiles : seed.profiles,
+    courses: courses?.length ? courses : seed.courses,
+    sections: sections?.length ? sections : seed.sections,
+    banks: banks || [],
+    quizzes: quizzes?.length ? quizzes : seed.quizzes,
+    questions: questions?.length ? questions : seed.questions,
+    attempts: attempts?.length ? attempts : seed.attempts,
+    students: students || []
   };
+}
+
+// ------------------------------------------------------------------
+// Image upload: convert to webp then upload to Supabase Storage.
+// Returns a public URL. Falls back to base64 dataURL if no Supabase
+// or if conversion/upload fails.
+// ------------------------------------------------------------------
+export const IMAGE_BUCKET = "question-images";
+
+function fileToImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+
+export async function toWebpBlob(file, { maxWidth = 1600, quality = 0.85 } = {}) {
+  const img = await fileToImage(file);
+  const scale = Math.min(1, maxWidth / (img.width || maxWidth));
+  const w = Math.round((img.width || maxWidth) * scale);
+  const h = Math.round((img.height || maxWidth) * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, w, h);
+  return new Promise((resolve) => {
+    canvas.toBlob(
+      (blob) => resolve(blob || null),
+      "image/webp",
+      quality
+    );
+  });
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Upload an image File -> webp. Returns { url, storagePath|null, base64 }.
+export async function uploadImage(file, folder = "questions") {
+  let webp = null;
+  try {
+    webp = await toWebpBlob(file);
+  } catch {
+    webp = null;
+  }
+  const blob = webp || file;
+
+  if (!supabase) {
+    // Local mode: embed as base64 dataURL (webp when conversion worked).
+    const dataUrl = await blobToDataURL(blob);
+    return { url: dataUrl, storagePath: null };
+  }
+
+  const ext = webp ? "webp" : (file.name.split(".").pop() || "png");
+  const path = `${folder}/${uid("img").replace(/[^a-z0-9-]/gi, "")}.${ext}`;
+  const { error } = await supabase.storage
+    .from(IMAGE_BUCKET)
+    .upload(path, blob, { contentType: webp ? "image/webp" : file.type, upsert: true });
+  if (error) {
+    console.warn("[minimoodle] fallo subida a Storage, usando base64:", error.message);
+    const dataUrl = await blobToDataURL(blob);
+    return { url: dataUrl, storagePath: null };
+  }
+  const { data } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path);
+  return { url: data.publicUrl, storagePath: path };
 }

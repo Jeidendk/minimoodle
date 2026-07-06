@@ -1,30 +1,103 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
-export default function QuizView({ data, quiz, submitAttempt, setView }) {
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+export default function QuizView({ data, quiz, user, submitAttempt, setView }) {
+  const [started, setStarted] = useState(false);
+  const [session, setSession] = useState(null); // { questions, optionOrders }
   const [answers, setAnswers] = useState({});
-  const [timeLeft, setTimeLeft] = useState(quiz ? quiz.time_limit_minutes * 60 : 0);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [markedForReview, setMarkedForReview] = useState(new Set());
-  
-  const questions = useMemo(() => data.questions.filter((question) => question.quiz_id === quiz?.id), [data, quiz]);
-  
+
+  const isBank = Boolean(quiz?.bank_id);
+  const minutesPerQuestion = Number(quiz?.minutes_per_question) || 1;
+
+  // Pool of questions available to this quiz (before draw/shuffle)
+  const pool = useMemo(() => {
+    if (!quiz) return [];
+    if (isBank) return data.questions.filter((q) => q.bank_id === quiz.bank_id);
+    return data.questions.filter((q) => q.quiz_id === quiz.id);
+  }, [data, quiz, isBank]);
+
+  // Questions this student already saw in OTHER simulators sharing this bank
+  const seenIds = useMemo(() => {
+    const set = new Set();
+    if (!isBank || !user) return set;
+    const sameBankQuizIds = new Set(
+      data.quizzes.filter((q) => q.bank_id === quiz.bank_id && q.id !== quiz.id).map((q) => q.id)
+    );
+    data.attempts
+      .filter((a) => a.student_id === user.id && sameBankQuizIds.has(a.quiz_id))
+      .forEach((a) => (a.question_ids || []).forEach((id) => set.add(id)));
+    return set;
+  }, [data.attempts, data.quizzes, quiz, user, isBank]);
+
+  // How many questions this attempt will have
+  const drawCount = useMemo(() => {
+    if (!isBank) return pool.length;
+    const want = Number(quiz.question_count) || pool.length;
+    return Math.min(want, pool.length);
+  }, [isBank, pool.length, quiz]);
+
+  const totalMinutes = isBank
+    ? Math.max(1, drawCount * minutesPerQuestion)
+    : (Number(quiz?.time_limit_minutes) || Math.max(1, pool.length * minutesPerQuestion));
+
+  // Build the attempt session (random draw + shuffle) — runs once when starting
+  function buildSession() {
+    let picked;
+    if (isBank) {
+      const fresh = pool.filter((q) => !seenIds.has(q.id));
+      // Prefer unseen; if not enough, top up with seen ones so the attempt still fills.
+      const base = fresh.length >= drawCount ? fresh : [...fresh, ...pool.filter((q) => seenIds.has(q.id))];
+      picked = shuffle(base).slice(0, drawCount);
+    } else {
+      picked = quiz.shuffle_questions === false ? [...pool] : shuffle(pool);
+    }
+    if (isBank && quiz.shuffle_questions === false) {
+      // keep original order of the drawn subset
+      const order = new Map(pool.map((q, i) => [q.id, i]));
+      picked = [...picked].sort((a, b) => order.get(a.id) - order.get(b.id));
+    }
+    const optionOrders = {};
+    picked.forEach((q) => {
+      const idxs = q.options.map((_, i) => i);
+      optionOrders[q.id] = quiz.shuffle_options === false ? idxs : shuffle(idxs);
+    });
+    setSession({ questions: picked, optionOrders });
+    setTimeLeft(totalMinutes * 60);
+    setStarted(true);
+  }
+
+  const questions = session?.questions || [];
+
   useEffect(() => {
-    if (!quiz || timeLeft <= 0) return;
+    if (!started || timeLeft <= 0) return;
     const timerId = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timerId);
-  }, [quiz, timeLeft]);
+  }, [started, timeLeft]);
 
   // Auto-submit when time is up
   useEffect(() => {
-    if (timeLeft === 0 && questions.length > 0) {
-      submitAttempt(answers);
+    if (started && timeLeft === 0 && questions.length > 0) {
+      submitAttempt(answers, questions.map((q) => q.id));
     }
-  }, [timeLeft, questions.length, answers, submitAttempt]);
+  }, [started, timeLeft, questions, answers, submitAttempt]);
 
   if (!quiz) return <p>Cuestionario no encontrado.</p>;
-  
+
+  const finish = () => submitAttempt(answers, questions.map((q) => q.id));
+
   const answered = Object.keys(answers).length;
-  
+
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -32,9 +105,71 @@ export default function QuizView({ data, quiz, submitAttempt, setView }) {
   };
 
   const isTimeLow = timeLeft < 300; // Less than 5 minutes
-  
+
   const question = questions[currentQuestionIndex];
-  
+
+  // ---------------------------------------------------------------
+  // START / INSTRUCTIONS SCREEN
+  // ---------------------------------------------------------------
+  if (!started) {
+    const availableUnseen = isBank ? pool.filter((q) => !seenIds.has(q.id)).length : pool.length;
+    const noQuestions = pool.length === 0;
+    return (
+      <section className="fade-in">
+        <button className="linkButton" onClick={() => setView("course")} style={{ marginBottom: "1rem" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          Volver al curso
+        </button>
+
+        <div className="quiz-start-card">
+          <div className="quiz-start-icon">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          </div>
+          <p className="quiz-start-eyebrow">EVALUACIÓN</p>
+          <h1 className="quiz-start-title">{quiz.title}</h1>
+          {quiz.instructions && <p className="quiz-start-instructions">{quiz.instructions}</p>}
+
+          <div className="quiz-start-facts">
+            <div className="quiz-fact">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              <strong>{noQuestions ? 0 : drawCount}</strong>
+              <span>Preguntas</span>
+            </div>
+            <div className="quiz-fact">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <strong>{totalMinutes} min</strong>
+              <span>Tiempo límite</span>
+            </div>
+            <div className="quiz-fact">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+              <strong>{quiz.shuffle_questions === false ? 'Fijo' : 'Aleatorio'}</strong>
+              <span>Orden</span>
+            </div>
+          </div>
+
+          <ul className="quiz-start-rules">
+            <li>Cada pregunta vale {minutesPerQuestion} min. El cronómetro inicia al presionar "Iniciar".</li>
+            {quiz.shuffle_options !== false && <li>Las opciones aparecen en orden aleatorio.</li>}
+            {isBank && <li>Tus preguntas se sortean de un banco; procuramos no repetir las que ya viste en otros simuladores.</li>}
+            <li>Al terminar verás tu puntaje y la revisión con las respuestas correctas.</li>
+          </ul>
+
+          {noQuestions ? (
+            <div className="quiz-start-empty">Este simulador aún no tiene preguntas configuradas.</div>
+          ) : (
+            <button className="btn-primary quiz-start-btn" onClick={buildSession}>
+              Iniciar evaluación
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="5 3 19 12 5 21 5 3"></polyline></svg>
+            </button>
+          )}
+          {isBank && !noQuestions && availableUnseen < drawCount && (
+            <p className="quiz-start-note">Nota: quedan {availableUnseen} preguntas nuevas en el banco; algunas podrían repetirse para completar {drawCount}.</p>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   const toggleMark = (id) => {
     const newMarked = new Set(markedForReview);
     if (newMarked.has(id)) {
@@ -84,14 +219,15 @@ export default function QuizView({ data, quiz, submitAttempt, setView }) {
              <div className="question-content" style={{ flex: 1 }}>
                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '2.5rem', color: 'var(--color-text)', lineHeight: 1.4 }}>{question.prompt}</h2>
                <div className="options" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                 {question.options.map((option, optionIndex) => {
-                   const isSelected = Number(answers[question.id]) === optionIndex;
+                 {(session?.optionOrders?.[question.id] || question.options.map((_, i) => i)).map((originalIndex, displayIndex) => {
+                   const option = question.options[originalIndex];
+                   const isSelected = Number(answers[question.id]) === originalIndex;
                    return (
-                     <label key={optionIndex} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem 1.5rem', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: '12px', background: isSelected ? '#EEF2FF' : 'white', cursor: 'pointer', transition: 'all 0.2s' }}>
+                     <label key={originalIndex} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.25rem 1.5rem', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: '12px', background: isSelected ? '#EEF2FF' : 'white', cursor: 'pointer', transition: 'all 0.2s' }}>
                        <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-muted)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                          {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--color-primary)' }}></div>}
                        </div>
-                       <input type="radio" name={question.id} style={{ display: 'none' }} checked={isSelected} onChange={() => setAnswers({ ...answers, [question.id]: optionIndex })} />
+                       <input type="radio" name={question.id} style={{ display: 'none' }} checked={isSelected} onChange={() => setAnswers({ ...answers, [question.id]: originalIndex })} />
                        <span style={{ fontWeight: 500, color: 'var(--color-text)', fontSize: '1rem' }}>{option}</span>
                      </label>
                    );
@@ -118,7 +254,7 @@ export default function QuizView({ data, quiz, submitAttempt, setView }) {
                  if (currentQuestionIndex < questions.length - 1) {
                    setCurrentQuestionIndex(prev => prev + 1);
                  } else {
-                   submitAttempt(answers);
+                   finish();
                  }
                }}>
                  {currentQuestionIndex < questions.length - 1 ? (
@@ -195,7 +331,7 @@ export default function QuizView({ data, quiz, submitAttempt, setView }) {
              </div>
            </div>
 
-           <button className="secondaryButton" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '0.5rem', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', background: 'white' }} onClick={() => submitAttempt(answers)}>
+           <button className="secondaryButton" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '0.5rem', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', background: 'white' }} onClick={finish}>
              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
              Enviar evaluación
            </button>
