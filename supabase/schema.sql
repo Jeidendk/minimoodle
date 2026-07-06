@@ -41,6 +41,7 @@ create table if not exists public.sections (
 create table if not exists public.question_banks (
   id text primary key,
   name text not null,
+  area text not null default '',
   description text not null default '',
   created_at timestamptz not null default now()
 );
