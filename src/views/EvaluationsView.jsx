@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { uid, uploadImage } from '../lib/data';
+import { DEFAULT_QUESTION, parseAiken, parseAsterisk, parseJson, parseQuestions, questionStatus } from '../lib/questionUtils';
 
 const TYPES = ['Cuestionario', 'Examen', 'Práctica'];
 const ANSWER_TYPES = ['Opción múltiple', 'Verdadero/Falso', 'Respuesta corta'];
@@ -19,120 +20,13 @@ const DEFAULT_CONFIG = {
   status: 'Borrador',
   // Question source
   origen: 'own',            // 'own' = preguntas propias | 'bank' = sortear de banco global
-  bankId: '',               // existing bank id when origen === 'bank'
+  bankIds: [],              // multiple selected bank ids
   bankName: '',             // name for a new bank
   questionCount: 10,        // how many to draw per attempt (bank mode)
   minutesPerQuestion: 1,    // 1 min per question
   shuffleQuestions: true,   // random order of questions per attempt
   shuffleOptions: true,     // random order of options per attempt
 };
-
-const DEFAULT_QUESTION = () => ({
-  id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-  statement: 'Si un cuaderno cuesta $4 y compras 3 cuadernos, ¿cuánto pagas en total?',
-  image: '',
-  answerType: 'Opción múltiple',
-  difficulty: 'Media',
-  points: 1,
-  options: ['$7', '$10', '$12', '$14'],
-  correctIndex: 2,
-  feedback: 'Cada cuaderno cuesta $4. Al comprar 3 cuadernos: $4 x 3 = $12.',
-});
-
-function parseAiken(text) {
-  const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
-  const out = [];
-  for (const block of blocks) {
-    const lines = block.split(/\n/).map(l => l.trim()).filter(Boolean);
-    if (lines.length < 3) continue;
-    const answerLineIdx = lines.findIndex(l => /^answer\s*:/i.test(l) || /^respuesta\s*:/i.test(l));
-    if (answerLineIdx === -1) continue;
-    const answerLetter = lines[answerLineIdx].split(':')[1]?.trim().toUpperCase()[0];
-    if (!answerLetter) continue;
-    const optionLines = lines.slice(0, answerLineIdx).filter(l => /^[A-Z][\.\)]\s+/.test(l));
-    const statementLines = lines.slice(0, answerLineIdx).filter(l => !/^[A-Z][\.\)]\s+/.test(l));
-    if (!statementLines.length || optionLines.length < 2) continue;
-    const options = optionLines.map(l => l.replace(/^[A-Z][\.\)]\s+/, ''));
-    const correctIndex = answerLetter.charCodeAt(0) - 65;
-    if (correctIndex < 0 || correctIndex >= options.length) continue;
-    out.push({
-      ...DEFAULT_QUESTION(),
-      id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      statement: statementLines.join(' '),
-      options,
-      correctIndex,
-      feedback: '',
-    });
-  }
-  return out;
-}
-
-function parseAsterisk(text) {
-  const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
-  const out = [];
-  for (const block of blocks) {
-    const lines = block.split(/\n/).map(l => l.trim()).filter(Boolean);
-    const optLines = lines.filter(l => /^[-•]\s+/.test(l));
-    const stmtLines = lines.filter(l => !/^[-•]\s+/.test(l));
-    if (!stmtLines.length || optLines.length < 2) continue;
-    let correctIndex = -1;
-    const options = optLines.map((l, i) => {
-      const stripped = l.replace(/^[-•]\s+/, '');
-      // leading '*' not followed by another '*' = correct marker
-      if (/^\*(?!\*)/.test(stripped)) { correctIndex = i; return stripped.slice(1).trim(); }
-      return stripped;
-    });
-    if (correctIndex === -1) continue;
-    out.push({
-      ...DEFAULT_QUESTION(),
-      id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      statement: stmtLines.join(' '),
-      options,
-      correctIndex,
-      feedback: '',
-    });
-  }
-  return out;
-}
-
-function parseJson(text) {
-  try {
-    const arr = JSON.parse(text);
-    if (!Array.isArray(arr)) return [];
-    return arr.map(q => ({
-      ...DEFAULT_QUESTION(),
-      id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      statement: String(q.pregunta || q.statement || ''),
-      options: Array.isArray(q.opciones || q.options) ? (q.opciones || q.options).map(String) : [],
-      correctIndex: Number(q.correcta ?? q.correctIndex ?? -1),
-      feedback: String(q.retro || q.feedback || ''),
-      points: Number(q.puntos || q.points || 1),
-    })).filter(q => q.statement && q.options.length >= 2 && q.correctIndex >= 0);
-  } catch { return []; }
-}
-
-function parseQuestions(text) {
-  const t = text.trim();
-  if (!t) return [];
-  // Auto-detect
-  if (t.startsWith('[') || t.startsWith('{')) {
-    const j = parseJson(t);
-    if (j.length) return { format: 'JSON', questions: j };
-  }
-  if (/^answer\s*:/im.test(t) || /^respuesta\s*:/im.test(t)) {
-    const a = parseAiken(t);
-    if (a.length) return { format: 'Aiken', questions: a };
-  }
-  if (/^[-•]\s/m.test(t)) {
-    const s = parseAsterisk(t);
-    if (s.length) return { format: 'Simple', questions: s };
-  }
-  for (const [name, fn] of [['Aiken', parseAiken], ['Simple', parseAsterisk], ['JSON', parseJson]]) {
-    const res = fn(t);
-    if (res.length) return { format: name, questions: res };
-  }
-  return { format: null, questions: [] };
-}
 
 function renderMd(text) {
   if (!text) return '';
@@ -151,11 +45,6 @@ function loadState() {
   return null;
 }
 
-function questionStatus(q) {
-  if (!q.statement.trim() || q.options.some(o => !o.trim()) || q.options.length < 2) return 'Borrador';
-  if (q.correctIndex == null || q.correctIndex < 0) return 'Borrador';
-  return 'Completa';
-}
 
 export default function EvaluationsView({ data, user, setView, saveRows, goCourse }) {
   const stored = loadState();
@@ -295,25 +184,25 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
     const isBank = config.origen === 'bank';
     let bankId = null;
 
+    let finalBankId = null;
+    let totalBankQs = 0;
+
     if (isBank) {
+      if (!config.bankIds || config.bankIds.length === 0) {
+        showToast('Selecciona al menos un banco de preguntas'); return;
+      }
+      finalBankId = config.bankIds.join(',');
+      totalBankQs = data.questions.filter(q => config.bankIds.includes(q.bank_id)).length;
+      
       const count = Number(config.questionCount) || 0;
       if (count < 1) { showToast('Indica cuántas preguntas se sortearán'); return; }
-      if (count > questions.length) { showToast(`El banco tiene ${questions.length} preguntas; no puedes sortear ${count}`); return; }
-      // Resolve or create the bank
-      bankId = config.bankId || uid('bank');
-      if (!config.bankId) {
-        const name = config.bankName.trim() || `Banco ${config.title.trim()}`;
-        saveRows && saveRows('question_banks', {
-          id: bankId, name, description: '', created_at: new Date().toISOString()
-        });
-      }
+      if (count > totalBankQs) { showToast(`Los bancos tienen ${totalBankQs} preguntas; no puedes sortear ${count}`); return; }
     }
 
     const quizId = uid('quiz');
     const mpq = Number(config.minutesPerQuestion) || 1;
-    // 0 (own mode) = use all questions. Bank mode always has a positive count.
     const requested = Number(config.questionCount) || 0;
-    const drawCount = requested > 0 ? Math.min(requested, questions.length) : questions.length;
+    const drawCount = isBank ? requested : questions.length;
 
     const newQuiz = {
       id: quizId,
@@ -324,8 +213,7 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
       opens_at: new Date().toISOString(),
       closes_at: "2026-12-31T23:59:00.000Z",
       time_limit_minutes: Math.max(1, drawCount * mpq),
-      bank_id: isBank ? bankId : null,
-      // Store the per-attempt count for BOTH modes (0 = all, in own mode).
+      bank_id: isBank ? finalBankId : null,
       question_count: requested > 0 ? drawCount : 0,
       minutes_per_question: mpq,
       shuffle_questions: config.shuffleQuestions !== false,
@@ -334,23 +222,23 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
       created_at: new Date().toISOString()
     };
 
-    const newQuestions = questions.map((q, i) => ({
-      // Reuse existing bank question ids so re-publishing the same bank upserts
-      id: (isBank && q.dbId) ? q.dbId : uid('q'),
-      quiz_id: isBank ? null : quizId,
-      bank_id: isBank ? bankId : null,
-      prompt: q.statement,
-      options: q.options,
-      answer_index: q.correctIndex,
-      explanation: q.feedback,
-      points: q.points,
-      image: q.image || null,
-      created_at: new Date().toISOString()
-    }));
-
     if (saveRows) {
       saveRows('quizzes', newQuiz);
-      saveRows('questions', newQuestions);
+      if (!isBank) {
+        const newQuestions = questions.map((q) => ({
+          id: uid('q'),
+          quiz_id: quizId,
+          bank_id: null,
+          prompt: q.statement,
+          options: q.options,
+          answer_index: q.correctIndex,
+          explanation: q.feedback,
+          points: q.points,
+          image: q.image || null,
+          created_at: new Date().toISOString()
+        }));
+        saveRows('questions', newQuestions);
+      }
     }
 
     updateConfig({ status: 'Publicada' });

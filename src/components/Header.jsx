@@ -40,6 +40,7 @@ export default function Header({
 
   const MORE_NAV = [
     { id: 'courses', label: 'Contenido', icon: <IconContent /> },
+    { id: 'banks', label: 'Bancos de Preguntas', icon: <IconContent /> },
     { id: 'communication', label: 'Comunicación', icon: <IconComm /> },
     { id: 'reports', label: 'Reportes', icon: <IconReports /> },
     { id: 'settings', label: 'Ajustes', icon: <IconSettings /> },

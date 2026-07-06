@@ -23,16 +23,23 @@ export default function QuizView({ data, quiz, user, submitAttempt, setView }) {
   // Pool of questions available to this quiz (before draw/shuffle)
   const pool = useMemo(() => {
     if (!quiz) return [];
-    if (isBank) return data.questions.filter((q) => q.bank_id === quiz.bank_id);
+    if (isBank) {
+      const bankIds = quiz.bank_id.split(',');
+      return data.questions.filter((q) => bankIds.includes(q.bank_id));
+    }
     return data.questions.filter((q) => q.quiz_id === quiz.id);
   }, [data, quiz, isBank]);
 
-  // Questions this student already saw in OTHER simulators sharing this bank
   const seenIds = useMemo(() => {
     const set = new Set();
     if (!isBank || !user) return set;
+    const bankIds = quiz.bank_id.split(',');
     const sameBankQuizIds = new Set(
-      data.quizzes.filter((q) => q.bank_id === quiz.bank_id && q.id !== quiz.id).map((q) => q.id)
+      data.quizzes.filter((q) => {
+        if (!q.bank_id || q.id === quiz.id) return false;
+        const qBanks = q.bank_id.split(',');
+        return qBanks.some(id => bankIds.includes(id));
+      }).map((q) => q.id)
     );
     data.attempts
       .filter((a) => a.student_id === user.id && sameBankQuizIds.has(a.quiz_id))

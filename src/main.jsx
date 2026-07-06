@@ -18,6 +18,7 @@ import GradesView from "./views/GradesView";
 import CommunicationView from "./views/CommunicationView";
 import ReportsView from "./views/ReportsView";
 import SettingsView from "./views/SettingsView";
+import BanksView from "./views/BanksView";
 
 const SESSION_KEY = "minimoodle:session";
 
@@ -260,6 +261,7 @@ function App() {
           {view === "communication" && <CommunicationView setView={setView} />}
           {view === "reports" && <ReportsView setView={setView} />}
           {view === "settings" && <SettingsView user={user} setView={setView} />}
+          {view === "banks" && <BanksView data={data} user={user} setView={setView} saveRows={saveRows} deleteRows={deleteRows} />}
         </div>
       </main>
     </div>
