@@ -361,6 +361,9 @@ export default function EvaluationsView({ data, user, setView, saveRows, deleteR
         else setView('courses');
       }, 1500);
     }
+    
+    // Clear the local draft since it's now saved in the DB
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
   };
 
   // Load an existing bank's questions into the builder (for reuse/editing)

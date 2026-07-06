@@ -10,6 +10,7 @@ export default function EvaluationsManagerView({ data, user, setView, setEditQui
   };
 
   const handleCreateNew = () => {
+    try { localStorage.removeItem('minimoodle:eval_state'); } catch {}
     setEditQuizId(null);
     setView('evaluation-editor');
   };
