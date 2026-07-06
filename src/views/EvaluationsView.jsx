@@ -948,12 +948,17 @@ ANSWER: B`}</pre>
                         showToast('Este banco no tiene preguntas');
                         return;
                       }
-                      // Clone questions to avoid linking to bank directly
+                      // Clone questions and map to UI format
                       const newQs = bankQs.map(q => ({
-                        ...q,
                         id: uid('q'),
+                        statement: q.prompt || '',
+                        options: q.options || ['', '', '', ''],
+                        correctIndex: typeof q.answer_index === 'number' ? q.answer_index : -1,
+                        feedback: q.explanation || '',
+                        points: q.points || 1,
+                        image: q.image || null,
                         bank_id: null,
-                        quiz_id: null // will be set on publish
+                        quiz_id: null
                       }));
                       setQuestions(prev => [...prev, ...newQs]);
                       showToast(`✓ ${newQs.length} preguntas importadas`);
