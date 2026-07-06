@@ -185,9 +185,9 @@ export default function BanksView({ data, user, setView, saveRows, deleteRows })
 
 // --- Detail View: Manage Questions in Bank ---
 function BankDetailView({ bank, onBack, data, saveRows, deleteRows }) {
-  const allQs = data.questions.filter(q => q.bank_id === bank.id);
-  const [questions, setQuestions] = useState(allQs);
+  const questions = data.questions.filter(q => q.bank_id === bank.id);
   const [toast, setToast] = useState(null);
+  const [editingQ, setEditingQ] = useState(null);
   
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
@@ -212,7 +212,6 @@ function BankDetailView({ bank, onBack, data, saveRows, deleteRows }) {
       }));
       
       saveRows('questions', newQs);
-      setQuestions([...questions, ...newQs]);
       showToast(`✓ ${parsed.length} preguntas importadas (${format})`);
     };
     reader.readAsText(file);
@@ -232,15 +231,21 @@ function BankDetailView({ bank, onBack, data, saveRows, deleteRows }) {
       created_at: new Date().toISOString()
     };
     saveRows('questions', newQ);
-    setQuestions([...questions, newQ]);
     showToast('Pregunta añadida');
+    setEditingQ(newQ); // Open editor immediately
   };
 
   const handleDeleteQ = (qId) => {
     if (!confirm('¿Eliminar esta pregunta?')) return;
     deleteRows('questions', qId);
-    setQuestions(questions.filter(q => q.id !== qId));
     showToast('Pregunta eliminada');
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingQ) return;
+    saveRows('questions', editingQ);
+    setEditingQ(null);
+    showToast('Cambios guardados');
   };
 
   const csvInputRef = useRef(null);
@@ -274,7 +279,7 @@ function BankDetailView({ bank, onBack, data, saveRows, deleteRows }) {
       </div>
 
       <div className="eval-layout" style={{ marginTop: '1rem' }}>
-        <div className="eval-main-column" style={{ width: '100%' }}>
+        <div className="eval-main-column" style={{ width: '100%', maxHeight: 'calc(100vh - 250px)', overflowY: 'auto', paddingRight: '1rem' }}>
           {questions.length === 0 ? (
             <div className="eval-panel" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
               <h3 style={{ color: '#64748B' }}>Este banco está vacío</h3>
@@ -295,9 +300,14 @@ function BankDetailView({ bank, onBack, data, saveRows, deleteRows }) {
                         ))}
                       </div>
                     </div>
-                    <button className="text-red" onClick={() => handleDeleteQ(q.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="text-blue" onClick={() => setEditingQ(q)} title="Editar" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                      </button>
+                      <button className="text-red" onClick={() => handleDeleteQ(q.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -305,6 +315,61 @@ function BankDetailView({ bank, onBack, data, saveRows, deleteRows }) {
           )}
         </div>
       </div>
+
+      {editingQ && (
+        <div className="modal-overlay" onClick={() => setEditingQ(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%' }}>
+            <div className="modal-header"><h2>Editar pregunta</h2><button className="modal-close" onClick={() => setEditingQ(null)}>&times;</button></div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-field">
+                <label>Enunciado</label>
+                <textarea 
+                  value={editingQ.prompt} 
+                  onChange={e => setEditingQ({...editingQ, prompt: e.target.value})} 
+                  rows={3} 
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+              <div className="form-field">
+                <label>Opciones</label>
+                {editingQ.options.map((opt, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <input 
+                      type="radio" 
+                      name="answer_index" 
+                      checked={editingQ.answer_index === i} 
+                      onChange={() => setEditingQ({...editingQ, answer_index: i})} 
+                      style={{ margin: 0 }}
+                    />
+                    <input 
+                      type="text" 
+                      value={opt} 
+                      onChange={e => {
+                        const newOpts = [...editingQ.options];
+                        newOpts[i] = e.target.value;
+                        setEditingQ({...editingQ, options: newOpts});
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="form-field">
+                <label>Explicación (opcional)</label>
+                <textarea 
+                  value={editingQ.explanation || ''} 
+                  onChange={e => setEditingQ({...editingQ, explanation: e.target.value})} 
+                  rows={2} 
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setEditingQ(null)}>Cancelar</button>
+              <button className="btn-primary" onClick={handleSaveEdit}>Guardar cambios</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
