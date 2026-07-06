@@ -2,6 +2,25 @@ import React, { useState, useRef } from 'react';
 import { uid, uploadImage } from '../lib/data';
 import { DEFAULT_QUESTION, parseQuestions, questionStatus } from '../lib/questionUtils';
 
+function BankForm({ values, onChange }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div className="form-field">
+        <label>Nombre del banco <span style={{ color: '#EF4444' }}>*</span></label>
+        <input type="text" placeholder="Ej. Banco de Matemática 3ro BGU" value={values.name} onChange={e => onChange({...values, name: e.target.value})} autoFocus />
+      </div>
+      <div className="form-field">
+        <label>Área o Tema</label>
+        <input type="text" placeholder="Ej. Álgebra" value={values.area} onChange={e => onChange({...values, area: e.target.value})} />
+      </div>
+      <div className="form-field">
+        <label>Descripción</label>
+        <textarea placeholder="Descripción del contenido..." value={values.description} onChange={e => onChange({...values, description: e.target.value})} rows={3} style={{ resize: 'vertical' }} />
+      </div>
+    </div>
+  );
+}
+
 export default function BanksView({ data, user, setView, saveRows, deleteRows }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
@@ -49,25 +68,6 @@ export default function BanksView({ data, user, setView, saveRows, deleteRows })
     if (bankQuestionIds.length) deleteRows('questions', bankQuestionIds);
     deleteRows('question_banks', bankId);
     setShowDeleteConfirm(null);
-  }
-
-  function BankForm({ values, onChange }) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <div className="form-field">
-          <label>Nombre del banco <span style={{ color: '#EF4444' }}>*</span></label>
-          <input type="text" placeholder="Ej. Banco de Matemática 3ro BGU" value={values.name} onChange={e => onChange({...values, name: e.target.value})} autoFocus />
-        </div>
-        <div className="form-field">
-          <label>Área o Tema</label>
-          <input type="text" placeholder="Ej. Álgebra" value={values.area} onChange={e => onChange({...values, area: e.target.value})} />
-        </div>
-        <div className="form-field">
-          <label>Descripción</label>
-          <textarea placeholder="Descripción del contenido..." value={values.description} onChange={e => onChange({...values, description: e.target.value})} rows={3} style={{ resize: 'vertical' }} />
-        </div>
-      </div>
-    );
   }
 
   if (selectedBank) {
