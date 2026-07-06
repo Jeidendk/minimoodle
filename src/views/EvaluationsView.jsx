@@ -53,6 +53,8 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
   const [questions, setQuestions] = useState(stored?.questions || [DEFAULT_QUESTION(), { ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }, { ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }, { ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [toast, setToast] = useState(null);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [newBankData, setNewBankData] = useState({ name: '', area: '', description: '' });
   const [pasteText, setPasteText] = useState('');
   const imageInputRef = useRef(null);
   const csvInputRef = useRef(null);
@@ -170,6 +172,59 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
     updateConfig({ status: 'Borrador' });
     showToast('Borrador guardado');
   };
+
+  const handleSaveAsBank = () => {
+    if (questions.length === 0 || (questions.length === 1 && !questions[0].statement)) {
+      showToast('No hay preguntas para guardar');
+      return;
+    }
+    setShowBankModal(true);
+  };
+
+  const confirmSaveAsBank = () => {
+    if (!newBankData.name.trim()) { showToast('El nombre del banco es obligatorio'); return; }
+    
+    // Create new bank
+    const bankId = uid('bank');
+    const bank = {
+      id: bankId,
+      name: newBankData.name.trim(),
+      area: newBankData.area.trim(),
+      description: newBankData.description.trim(),
+      created_at: new Date().toISOString()
+    };
+    
+    // Map current UI questions to DB format for the bank
+    const qsToSave = questions.map(q => ({
+      id: uid('q'),
+      bank_id: bankId,
+      quiz_id: null,
+      prompt: q.statement,
+      options: q.options,
+      answer_index: q.correctIndex,
+      explanation: q.feedback,
+      points: q.points || 1,
+      image: q.image || null,
+      created_at: new Date().toISOString()
+    }));
+    
+    // Save bank and questions
+    saveRows('question_banks', bank);
+    saveRows('questions', qsToSave);
+    
+    setShowBankModal(false);
+    setNewBankData({ name: '', area: '', description: '' });
+    showToast(`✓ Banco creado con ${qsToSave.length} preguntas`);
+  };
+
+  const validateQuestions = () => {
+    const invalid = questions.findIndex(q => questionStatus(q) !== 'Completa');
+    if (invalid !== -1) {
+      setActiveIdx(invalid);
+      showToast(`Falta completar la pregunta ${invalid + 1}`);
+      return;
+    }
+  }
 
   const publish = () => {
     const invalid = questions.findIndex(q => questionStatus(q) !== 'Completa');
@@ -442,6 +497,10 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
             <div className="eval-panel-header-flex">
               <h2>1. Configuración de la evaluación</h2>
               <div className="eval-global-actions">
+                <button className="eval-btn-outline" onClick={handleSaveAsBank} title="Guardar estas preguntas como un banco reutilizable">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                  Guardar como Banco
+                </button>
                 <button className="eval-btn-outline" onClick={saveDraft}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                   Guardar borrador
@@ -1116,6 +1175,38 @@ ANSWER: B`}</pre>
       </div>
 
       {toast && <div className="students-toast fade-in">{toast}</div>}
+
+      {showBankModal && (
+        <div className="modal-overlay" onClick={() => setShowBankModal(false)}>
+          <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px', width: '90%' }}>
+            <div className="modal-header">
+              <h2>Guardar como Banco de Preguntas</h2>
+              <button className="modal-close" onClick={() => setShowBankModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p style={{ fontSize: '0.9rem', color: 'var(--color-muted)' }}>
+                Se copiarán las <strong>{questions.length}</strong> preguntas actuales a un nuevo banco para que puedas reutilizarlas en el futuro.
+              </p>
+              <div className="form-field">
+                <label>Nombre del banco <span style={{color: 'red'}}>*</span></label>
+                <input type="text" className="eval-input" placeholder="Ej: Simulador 2" value={newBankData.name} onChange={e => setNewBankData({...newBankData, name: e.target.value})} autoFocus />
+              </div>
+              <div className="form-field">
+                <label>Área o Tema (opcional)</label>
+                <input type="text" className="eval-input" placeholder="Ej: Verbal" value={newBankData.area} onChange={e => setNewBankData({...newBankData, area: e.target.value})} />
+              </div>
+              <div className="form-field">
+                <label>Descripción (opcional)</label>
+                <textarea className="eval-input" rows="2" placeholder="Detalles del banco..." value={newBankData.description} onChange={e => setNewBankData({...newBankData, description: e.target.value})}></textarea>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button className="btn-secondary" onClick={() => setShowBankModal(false)}>Cancelar</button>
+              <button className="btn-primary" onClick={confirmSaveAsBank}>Guardar banco</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
