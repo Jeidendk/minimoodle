@@ -60,7 +60,7 @@ export default function EvaluationsView({ data, user, setView, saveRows, deleteR
 
   const pastePreview = useMemo(() => parseQuestions(pasteText), [pasteText]);
 
-  // Load initial data based on editQuizId or localStorage
+  // Load initial data ONCE on mount
   useEffect(() => {
     if (editQuizId) {
       const quiz = data.quizzes?.find(q => q.id === editQuizId);
@@ -95,12 +95,10 @@ export default function EvaluationsView({ data, user, setView, saveRows, deleteR
           })));
         }
       }
-    } else {
-      const stored = loadState();
-      if (stored?.config) setConfig(stored.config);
-      if (stored?.questions && stored.questions.length > 0) setQuestions(stored.questions);
     }
-  }, [editQuizId, data.quizzes, data.questions]);
+    // When editQuizId is null (new evaluation), we keep the default clean state.
+    // No localStorage loading — the key prop on the component forces a clean remount.
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Set default course/section if empty
   useEffect(() => {
@@ -118,11 +116,8 @@ export default function EvaluationsView({ data, user, setView, saveRows, deleteR
     }
   }, [config.courseId, config.sectionId, data?.sections]);
 
-  useEffect(() => {
-    if (!editQuizId) {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ config, questions })); } catch {}
-    }
-  }, [config, questions, editQuizId]);
+
+
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
