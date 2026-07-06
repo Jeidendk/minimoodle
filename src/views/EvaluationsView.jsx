@@ -609,7 +609,7 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
             <div className="eval-tabs">
               <button className={`eval-tab ${activeTab === 'individual' ? 'active' : ''}`} onClick={() => setActiveTab('individual')}>Pregunta individual</button>
               <button className={`eval-tab ${activeTab === 'masiva' ? 'active' : ''}`} onClick={() => setActiveTab('masiva')}>Carga masiva</button>
-              <button className={`eval-tab ${activeTab === 'banco' ? 'active' : ''}`} onClick={() => setActiveTab('banco')}>Banco de preguntas</button>
+              <button className={`eval-tab ${activeTab === 'banco' ? 'active' : ''}`} onClick={() => setActiveTab('banco')}>Importar de banco</button>
             </div>
 
             <div className="eval-tab-content">
@@ -920,24 +920,47 @@ ANSWER: B`}</pre>
 
               {activeTab === 'banco' && (
                 <div style={{ padding: '1.5rem' }}>
-                  <h3 style={{ marginBottom: '1rem', color: 'var(--color-text)' }}>Banco de preguntas ({questions.length})</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {questions.map((q, i) => (
-                      <div
-                        key={q.id}
-                        onClick={() => { setActiveIdx(i); setActiveTab('individual'); }}
-                        style={{ padding: '0.85rem 1rem', background: i === activeIdx ? '#EEF2FF' : 'var(--color-bg)', borderRadius: 10, cursor: 'pointer', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                      >
-                        <span>
-                          <strong>P{i + 1}:</strong>{' '}
-                          {q.statement
-                            ? <span dangerouslySetInnerHTML={{ __html: renderMd(q.statement.slice(0, 80)) + (q.statement.length > 80 ? '...' : '') }} />
-                            : <em style={{ color: 'var(--color-muted)' }}>Sin enunciado</em>}
-                        </span>
-                        <span className={`eval-badge ${questionStatus(q) === 'Completa' ? 'green' : 'orange'}`}>{questionStatus(q)}</span>
-                      </div>
-                    ))}
+                  <h3 style={{ marginBottom: '1rem', color: 'var(--color-text)' }}>Importar preguntas de un banco</h3>
+                  <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                    Si quieres crear una evaluación fija (sin sorteo aleatorio), puedes copiar las preguntas de tus bancos directamente aquí.
+                  </p>
+                  
+                  <div className="eval-form-group">
+                    <label>Selecciona un banco</label>
+                    <div className="eval-select-wrapper">
+                      <select id="import-bank-select" className="eval-input" defaultValue="">
+                        <option value="" disabled>Elige un banco...</option>
+                        {(data.question_banks || []).map(b => (
+                          <option key={b.id} value={b.id}>{b.name} ({data.questions.filter(q => q.bank_id === b.id).length} preg)</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
+                  
+                  <button 
+                    className="eval-btn-primary" 
+                    style={{ marginTop: '1rem' }}
+                    onClick={() => {
+                      const sel = document.getElementById('import-bank-select');
+                      if (!sel || !sel.value) return;
+                      const bankQs = data.questions.filter(q => q.bank_id === sel.value);
+                      if (!bankQs.length) {
+                        showToast('Este banco no tiene preguntas');
+                        return;
+                      }
+                      // Clone questions to avoid linking to bank directly
+                      const newQs = bankQs.map(q => ({
+                        ...q,
+                        id: uid('q'),
+                        bank_id: null,
+                        quiz_id: null // will be set on publish
+                      }));
+                      setQuestions(prev => [...prev, ...newQs]);
+                      showToast(`✓ ${newQs.length} preguntas importadas`);
+                    }}
+                  >
+                    Importar preguntas al cuestionario
+                  </button>
                 </div>
               )}
             </div>
