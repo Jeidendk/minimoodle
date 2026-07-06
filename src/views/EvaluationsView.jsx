@@ -311,7 +311,9 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
 
     const quizId = uid('quiz');
     const mpq = Number(config.minutesPerQuestion) || 1;
-    const drawCount = isBank ? (Number(config.questionCount) || questions.length) : questions.length;
+    // 0 (own mode) = use all questions. Bank mode always has a positive count.
+    const requested = Number(config.questionCount) || 0;
+    const drawCount = requested > 0 ? Math.min(requested, questions.length) : questions.length;
 
     const newQuiz = {
       id: quizId,
@@ -323,7 +325,8 @@ export default function EvaluationsView({ data, user, setView, saveRows, goCours
       closes_at: "2026-12-31T23:59:00.000Z",
       time_limit_minutes: Math.max(1, drawCount * mpq),
       bank_id: isBank ? bankId : null,
-      question_count: isBank ? drawCount : 0,
+      // Store the per-attempt count for BOTH modes (0 = all, in own mode).
+      question_count: requested > 0 ? drawCount : 0,
       minutes_per_question: mpq,
       shuffle_questions: config.shuffleQuestions !== false,
       shuffle_options: config.shuffleOptions !== false,
@@ -653,13 +656,25 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
                   <input type="text" className="eval-input" value={config.bankName} placeholder="Ej. Banco Matemática 3ro BGU" onChange={(e) => updateConfig({ bankName: e.target.value })} />
                 </div>
               )}
-              {config.origen === 'bank' && (
-                <div className="eval-form-group">
-                  <label>Preguntas a sortear por intento</label>
-                  <input type="number" min="1" max={questions.length} className="eval-input" value={config.questionCount} onChange={(e) => updateConfig({ questionCount: Number(e.target.value) || 1 })} />
-                  <small style={{ color: 'var(--color-muted)', fontSize: '0.7rem', marginTop: '0.25rem', display: 'block' }}>Banco actual: {questions.length} preguntas · cada estudiante recibe {Math.min(Number(config.questionCount) || 0, questions.length)} al azar</small>
-                </div>
-              )}
+
+              {/* Questions-per-attempt works in BOTH modes: 0 = todas */}
+              <div className="eval-form-group">
+                <label>Preguntas por intento {config.origen === 'own' ? '(0 = todas)' : ''}</label>
+                <input
+                  type="number"
+                  min={config.origen === 'bank' ? 1 : 0}
+                  max={questions.length}
+                  className="eval-input"
+                  value={config.questionCount}
+                  onChange={(e) => updateConfig({ questionCount: Math.max(0, Number(e.target.value) || 0) })}
+                />
+                <small style={{ color: 'var(--color-muted)', fontSize: '0.7rem', marginTop: '0.25rem', display: 'block' }}>
+                  Total disponible: {questions.length} · cada estudiante recibe {(() => {
+                    const n = Number(config.questionCount) || 0;
+                    return (n > 0 ? Math.min(n, questions.length) : questions.length);
+                  })()} al azar
+                </small>
+              </div>
 
               <div className="eval-form-group toggle-group">
                 <span>Mezclar preguntas (orden aleatorio)</span>

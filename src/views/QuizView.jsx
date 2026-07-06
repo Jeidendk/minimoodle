@@ -40,16 +40,13 @@ export default function QuizView({ data, quiz, user, submitAttempt, setView }) {
     return set;
   }, [data.attempts, data.quizzes, quiz, user, isBank]);
 
-  // How many questions this attempt will have
+  // How many questions this attempt will have (question_count 0 = all)
   const drawCount = useMemo(() => {
-    if (!isBank) return pool.length;
-    const want = Number(quiz.question_count) || pool.length;
-    return Math.min(want, pool.length);
-  }, [isBank, pool.length, quiz]);
+    const want = Number(quiz?.question_count) || 0;
+    return want > 0 ? Math.min(want, pool.length) : pool.length;
+  }, [pool.length, quiz]);
 
-  const totalMinutes = isBank
-    ? Math.max(1, drawCount * minutesPerQuestion)
-    : (Number(quiz?.time_limit_minutes) || Math.max(1, pool.length * minutesPerQuestion));
+  const totalMinutes = Math.max(1, drawCount * minutesPerQuestion);
 
   // Build the attempt session (random draw + shuffle) — runs once when starting
   function buildSession() {
@@ -60,9 +57,10 @@ export default function QuizView({ data, quiz, user, submitAttempt, setView }) {
       const base = fresh.length >= drawCount ? fresh : [...fresh, ...pool.filter((q) => seenIds.has(q.id))];
       picked = shuffle(base).slice(0, drawCount);
     } else {
-      picked = quiz.shuffle_questions === false ? [...pool] : shuffle(pool);
+      // Own-mode quiz: draw drawCount random from its own questions (or all).
+      picked = shuffle(pool).slice(0, drawCount);
     }
-    if (isBank && quiz.shuffle_questions === false) {
+    if (quiz.shuffle_questions === false) {
       // keep original order of the drawn subset
       const order = new Map(pool.map((q, i) => [q.id, i]));
       picked = [...picked].sort((a, b) => order.get(a.id) - order.get(b.id));
