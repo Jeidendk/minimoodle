@@ -183,9 +183,18 @@ function App() {
   }
 
   if (!data) return (
-    <main className="loading-screen">
-      <div className="loader"></div>
-      <p>Cargando MiniMoodle...</p>
+    <main className="loading-screen" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      {error ? (
+        <div style={{ backgroundColor: '#FEE2E2', color: '#B91C1C', padding: '1rem', borderRadius: '8px', maxWidth: '400px', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 0.5rem 0' }}>Error de Conexión</h3>
+          <p style={{ margin: 0 }}>{error}</p>
+        </div>
+      ) : (
+        <>
+          <div className="loader"></div>
+          <p>Cargando MiniMoodle...</p>
+        </>
+      )}
     </main>
   );
 
