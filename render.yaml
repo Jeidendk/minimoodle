@@ -2,7 +2,7 @@ services:
   - type: web
     name: minimoodle-web
     env: static
-    buildCommand: npm install && npm run build
+    buildCommand: pnpm install && pnpm run build
     staticPublishPath: ./dist
     routes:
       - type: rewrite
