@@ -1008,9 +1008,26 @@ ANSWER: B`}</pre>
             <div className="eval-side-header flex-between">
               <div className="flex-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line></svg>
-                Estructura de la evaluación
+                Estructura
               </div>
-              <button className="eval-btn-text" onClick={addQuestion} style={{ padding: 0 }}>+ Agregar</button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button 
+                  className="eval-btn-text" 
+                  onClick={() => {
+                    if (questions.length === 0) return;
+                    if (confirm('¿Estás seguro de eliminar TODAS las preguntas de esta evaluación?')) {
+                      setQuestions([{ ...DEFAULT_QUESTION(), statement: '', options: ['', '', '', ''], correctIndex: -1 }]);
+                      setActiveIdx(0);
+                      showToast('Todas las preguntas fueron eliminadas');
+                    }
+                  }} 
+                  style={{ padding: 0, color: '#EF4444' }} 
+                  title="Vaciar cuestionario"
+                >
+                  Vaciar
+                </button>
+                <button className="eval-btn-text" onClick={addQuestion} style={{ padding: 0 }}>+ Agregar</button>
+              </div>
             </div>
             <div className="eval-structure-list">
               {questions.map((q, i) => {
@@ -1029,6 +1046,22 @@ ANSWER: B`}</pre>
                     <span className="str-title">Pregunta {i + 1}</span>
                     <span className="str-pts">{q.points} pts</span>
                     <span className={`str-status ${color}`}><div className="dot"></div> {label}</span>
+                    <button 
+                      className="text-red" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (questions.length <= 1) { showToast('Debe existir al menos una pregunta'); return; }
+                        if (!confirm(`¿Eliminar la Pregunta ${i + 1}?`)) return;
+                        const newList = questions.filter((_, idx) => idx !== i);
+                        setQuestions(newList);
+                        if (activeIdx >= newList.length) setActiveIdx(newList.length - 1);
+                        showToast('Pregunta eliminada');
+                      }} 
+                      title="Eliminar pregunta" 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', marginLeft: 'auto' }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
                   </div>
                 );
               })}
