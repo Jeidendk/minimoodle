@@ -137,27 +137,7 @@ export default function LoginView({ onLogin }) {
               </button>
             </form>
             
-            <div className="login-divider">
-              <span>Credenciales de prueba</span>
-            </div>
-            
-            <div className="login-test-creds">
-              <div className="cred-row">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="cred-icon outline-teal">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-                <span className="cred-label">Cédula de docente de prueba:</span>
-                <strong className="cred-val">1996202530</strong>
-              </div>
-              <div className="cred-row">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="cred-icon fill-teal">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
-                <span className="cred-label">Cédula de estudiante de prueba:</span>
-                <strong className="cred-val">1234567890</strong>
-              </div>
-            </div>
+
 
             <div className="login-help">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
