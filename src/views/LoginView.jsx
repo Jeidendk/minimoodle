@@ -8,12 +8,12 @@ export default function LoginView({ onLogin }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!cedula.trim()) {
-      setError("Por favor ingresa tu número de cédula");
+      setError("Por favor ingresa tu cédula o código de acceso");
       return;
     }
     const success = onLogin(cedula.trim(), remember);
     if (!success) {
-      setError("Cédula no encontrada. Verifica el número e intenta nuevamente.");
+      setError("Cédula o código no encontrado. Verifica la información e intenta nuevamente.");
     }
   };
 
@@ -95,7 +95,7 @@ export default function LoginView({ onLogin }) {
             
             <form onSubmit={handleSubmit} className="login-form-new">
               <div className="form-group">
-                <label htmlFor="cedula">Número de Cédula</label>
+                <label htmlFor="cedula">Cédula o Código de Acceso</label>
                 <div className="input-with-icon">
                   <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -110,7 +110,7 @@ export default function LoginView({ onLogin }) {
                       setCedula(e.target.value);
                       setError("");
                     }}
-                    placeholder="Ingresa tu cédula..."
+                    placeholder="Ingresa tu cédula o código..."
                     autoFocus
                   />
                 </div>

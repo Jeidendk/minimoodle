@@ -51,7 +51,7 @@ function App() {
       setData(d);
       const stored = loadStoredSession();
       if (stored?.cedula) {
-        const profile = d.profiles.find((p) => p.cedula === stored.cedula);
+        const profile = d.profiles.find((p) => p.cedula === stored.cedula || p.code === stored.cedula);
         if (profile) setUser(profile);
       }
     }).catch((err) => setError(err.message || "No se pudo cargar la información."));
@@ -66,7 +66,7 @@ function App() {
 
   function handleLogin(cedula, remember = true) {
     if (!data) return false;
-    const profile = data.profiles.find((p) => p.cedula === cedula);
+    const profile = data.profiles.find((p) => p.cedula === cedula || p.code === cedula);
     if (profile) {
       setUser(profile);
       setView("area");
