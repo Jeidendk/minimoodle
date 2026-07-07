@@ -196,13 +196,13 @@ export async function loadData() {
     safeSelect("students", "registered_at", { ascending: false })
   ]);
   return {
-    profiles: profiles?.length ? profiles : seed.profiles,
-    courses: courses?.length ? courses : seed.courses,
-    sections: sections?.length ? sections : seed.sections,
+    profiles: profiles || seed.profiles,
+    courses: courses || seed.courses,
+    sections: sections || seed.sections,
     question_banks: banks || [],
-    quizzes: quizzes?.length ? quizzes : seed.quizzes,
-    questions: questions?.length ? questions : seed.questions,
-    attempts: attempts?.length ? attempts : seed.attempts,
+    quizzes: quizzes || seed.quizzes,
+    questions: questions || seed.questions,
+    attempts: attempts || seed.attempts,
     students: students || []
   };
 }

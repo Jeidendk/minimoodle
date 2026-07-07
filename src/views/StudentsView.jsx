@@ -202,6 +202,21 @@ export default function StudentsView({ data, user, setView, saveRows, deleteRows
     showToast(`Exportado ${filtered.length} estudiantes`);
   };
 
+  const generateMassiveCodes = async () => {
+    if (students.length === 0) return;
+    if (confirm("¿Estás seguro de regenerar los códigos de acceso para TODOS los estudiantes? Los códigos anteriores dejarán de funcionar.")) {
+      const updatedStudents = students.map(s => {
+        const row = toRow(s);
+        row.code = generateCode();
+        return row;
+      });
+      if (saveRows) {
+        await saveRows('students', updatedStudents);
+        showToast('Se han generado nuevos códigos para todos los estudiantes');
+      }
+    }
+  };
+
   return (
     <section className="students-dashboard fade-in">
       {/* Header */}
@@ -400,10 +415,53 @@ export default function StudentsView({ data, user, setView, saveRows, deleteRows
 
       {tab === 'codes' && (
         <div className="students-table">
-          <div className="empty-row" style={{ padding: '4rem 2rem' }}>
-            <h3 style={{ marginBottom: '0.5rem', color: 'var(--color-text)' }}>Códigos de acceso activos</h3>
-            <p>{students.filter(s => s.status === 'Activo').length} códigos en uso. Regenera cualquier código desde el menú de acciones del estudiante.</p>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+            <button className="btn-primary-new" onClick={generateMassiveCodes}>
+              Generar códigos masivamente
+            </button>
           </div>
+          <div className="students-table-header" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr' }}>
+            <div>Estudiante</div>
+            <div>Curso(s)</div>
+            <div>Código de acceso</div>
+            <div className="text-right">Acciones</div>
+          </div>
+          {students.length === 0 ? (
+            <div className="empty-row">
+              <p>No hay estudiantes registrados para mostrar códigos.</p>
+            </div>
+          ) : (
+            students.map(s => (
+              <div className="students-row" style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr' }} key={s.id}>
+                <div className="student-cell">
+                  <div className="student-avatar" style={{ backgroundColor: `${s.color}22`, color: s.color }}>{s.initials}</div>
+                  <div className="student-info">
+                    <strong>{s.name}</strong>
+                  </div>
+                </div>
+                <div className="courses-pills">
+                  {s.courses.map(c => (
+                    <span key={c.label} className={`course-pill pill-${c.color}`}>{c.label}</span>
+                  ))}
+                </div>
+                <div className="code-cell">
+                  <code>{s.code}</code>
+                  <button className="copy-btn" onClick={() => copyCode(s.id, s.code)} title="Copiar código">
+                    {copied === s.id ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    )}
+                  </button>
+                </div>
+                <div className="actions-cell text-right" style={{ justifyContent: 'flex-end' }}>
+                  <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => regenerateCode(s.id)}>
+                    Regenerar
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -425,6 +483,7 @@ export default function StudentsView({ data, user, setView, saveRows, deleteRows
           title="Invitar estudiante"
           submitLabel="Enviar invitación"
           initial={{ name: '', cedula: '', email: '', courses: [] }}
+          availableCourses={data.courses || []}
           onCancel={() => setInviteOpen(false)}
           onSubmit={inviteStudent}
         />
@@ -441,6 +500,7 @@ export default function StudentsView({ data, user, setView, saveRows, deleteRows
             email: editStudent.email,
             courses: editStudent.courses.map(c => c.label),
           }}
+          availableCourses={data.courses || []}
           onCancel={() => setEditStudent(null)}
           onSubmit={(payload) => saveEdit({ ...payload, id: editStudent.id })}
         />
@@ -484,24 +544,33 @@ export default function StudentsView({ data, user, setView, saveRows, deleteRows
   );
 }
 
-function StudentModal({ title, submitLabel, initial, onCancel, onSubmit }) {
+function StudentModal({ title, submitLabel, initial, availableCourses = [], onCancel, onSubmit }) {
   const [form, setForm] = useState(initial);
   const [err, setErr] = useState('');
 
-  const toggleCourse = (label) => {
-    setForm((f) => ({
-      ...f,
-      courses: f.courses.includes(label) ? f.courses.filter(c => c !== label) : [...f.courses, label],
-    }));
+  const toggleCourse = (courseStr) => {
+    setForm((f) => {
+      const exists = f.courses.includes(courseStr);
+      return {
+        ...f,
+        courses: exists ? f.courses.filter(c => c !== courseStr) : [...f.courses, courseStr],
+      };
+    });
   };
 
   const submit = (e) => {
     e.preventDefault();
     if (!form.name.trim()) return setErr('El nombre es obligatorio');
-    if (!/^\d{6,}$/.test(form.cedula.trim())) return setErr('Cédula inválida (mínimo 6 dígitos)');
-    if (!/\S+@\S+\.\S+/.test(form.email.trim())) return setErr('Email inválido');
+    
+    const ced = form.cedula.trim();
+    if (ced && !/^\d{6,}$/.test(ced)) return setErr('Cédula inválida (mínimo 6 dígitos)');
+    
+    const em = form.email.trim();
+    if (em && !/\S+@\S+\.\S+/.test(em)) return setErr('Email inválido');
+    
     if (!form.courses.length) return setErr('Selecciona al menos un curso');
-    onSubmit({ ...form, name: form.name.trim(), cedula: form.cedula.trim(), email: form.email.trim() });
+    
+    onSubmit({ ...form, name: form.name.trim(), cedula: ced, email: em });
   };
 
   return (
@@ -517,26 +586,36 @@ function StudentModal({ title, submitLabel, initial, onCancel, onSubmit }) {
             <input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); setErr(''); }} placeholder="Ej. María García" autoFocus />
           </div>
           <div className="modal-field">
-            <label>Cédula</label>
+            <label>Cédula (Opcional)</label>
             <input value={form.cedula} onChange={(e) => { setForm({ ...form, cedula: e.target.value }); setErr(''); }} placeholder="1234567890" inputMode="numeric" />
           </div>
           <div className="modal-field">
-            <label>Correo electrónico</label>
+            <label>Correo electrónico (Opcional)</label>
             <input type="email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); setErr(''); }} placeholder="estudiante@email.com" />
           </div>
           <div className="modal-field">
             <label>Cursos</label>
             <div className="courses-pills">
-              {COURSE_LIST.map(c => (
-                <button
-                  type="button"
-                  key={c}
-                  className={`course-pill pill-${COURSE_COLORS[c]} ${form.courses.includes(c) ? 'selected' : 'unselected'}`}
-                  onClick={() => toggleCourse(c)}
-                >
-                  {form.courses.includes(c) ? '✓ ' : ''}{c}
-                </button>
-              ))}
+              {availableCourses.map(c => {
+                const isSelected = form.courses.includes(c.title);
+                return (
+                  <button
+                    type="button"
+                    key={c.id}
+                    className={`course-pill ${isSelected ? 'selected' : 'unselected'}`}
+                    style={{ 
+                      backgroundColor: isSelected ? c.color : 'transparent',
+                      color: isSelected ? '#fff' : c.color,
+                      borderColor: c.color,
+                      borderStyle: 'solid',
+                      borderWidth: '1px'
+                    }}
+                    onClick={() => toggleCourse(c.title)}
+                  >
+                    {isSelected ? '✓ ' : ''}{c.title}
+                  </button>
+                );
+              })}
             </div>
           </div>
           {err && <div className="modal-error">{err}</div>}

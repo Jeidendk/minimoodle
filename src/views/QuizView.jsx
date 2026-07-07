@@ -119,6 +119,14 @@ export default function QuizView({ data, quiz, user, submitAttempt, setView }) {
   if (!started) {
     const availableUnseen = isBank ? pool.filter((q) => !seenIds.has(q.id)).length : pool.length;
     const noQuestions = pool.length === 0;
+
+    const myAttempts = data.attempts
+      .filter((a) => a.student_id === user.id && a.quiz_id === quiz.id)
+      .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+
+    const maxScore = myAttempts.length > 0 ? Math.max(...myAttempts.map(a => Number(a.score))) : 0;
+    const maxTotal = myAttempts.length > 0 ? myAttempts[0].total : 0;
+
     return (
       <section className="fade-in">
         <button className="linkButton" onClick={() => setView("course")} style={{ marginBottom: "1rem" }}>
@@ -126,7 +134,7 @@ export default function QuizView({ data, quiz, user, submitAttempt, setView }) {
           Volver al curso
         </button>
 
-        <div className="quiz-start-card">
+        <div className="quiz-start-card" style={{ maxWidth: '800px' }}>
           <div className="quiz-start-icon">
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
           </div>
@@ -159,11 +167,45 @@ export default function QuizView({ data, quiz, user, submitAttempt, setView }) {
             <li>Al terminar verás tu puntaje y la revisión con las respuestas correctas.</li>
           </ul>
 
+          {myAttempts.length > 0 && (
+            <div className="attempts-history" style={{ marginTop: '2rem', marginBottom: '2rem', width: '100%', textAlign: 'left' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--color-text)' }}>Resumen de sus intentos previos</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <thead style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--color-border)' }}>
+                    <tr>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '0.85rem' }}>Intento</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '0.85rem' }}>Estado</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '0.85rem' }}>Calificación</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myAttempts.map((a, i) => (
+                      <tr key={a.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#334155' }}>{i + 1}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
+                          <div style={{ fontWeight: 500 }}>Finalizado</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748B' }}>Enviado: {new Date(a.submitted_at).toLocaleString()}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 600, color: 'var(--color-primary)' }}>
+                          {a.score} / {a.total}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: '1rem', fontSize: '1.1rem', color: 'var(--color-text)' }}>
+                Calificación más alta: <strong style={{ color: 'var(--color-primary)' }}>{maxScore} / {maxTotal}</strong>
+              </div>
+            </div>
+          )}
+
           {noQuestions ? (
             <div className="quiz-start-empty">Este simulador aún no tiene preguntas configuradas.</div>
           ) : (
             <button className="btn-primary quiz-start-btn" onClick={buildSession}>
-              Iniciar evaluación
+              {myAttempts.length > 0 ? "Reintentar el cuestionario" : "Iniciar evaluación"}
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="5 3 19 12 5 21 5 3"></polyline></svg>
             </button>
           )}

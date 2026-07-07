@@ -299,7 +299,7 @@ export default function EvaluationsView({ data, user, setView, saveRows, deleteR
     
     const mpq = Number(config.minutesPerQuestion) || 1;
     const requested = Number(config.questionCount) || 0;
-    const drawCount = isBank ? requested : questions.length;
+    const drawCount = isBank ? requested : (requested > 0 ? Math.min(requested, questions.length) : questions.length);
 
     const newQuiz = {
       id: quizId,
@@ -564,7 +564,7 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                   Guardar borrador
                 </button>
-                <button className="eval-btn-primary" onClick={publish}>
+                <button className="eval-btn-primary" onClick={() => publish(false)}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                   Publicar evaluación
                 </button>
@@ -630,7 +630,7 @@ Selecciona la _correcta_ (usa **negrita** e _itálica_):
                 <label>Tiempo total (automático)</label>
                 <div className="eval-input-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                  <input type="text" className="eval-input" readOnly value={`${Math.max(1, (config.origen === 'bank' ? (Number(config.questionCount) || 0) : questions.length) * (Number(config.minutesPerQuestion) || 1))} min`} />
+                  <input type="text" className="eval-input" readOnly value={`${Math.max(1, (Number(config.questionCount) > 0 ? Math.min(Number(config.questionCount), questions.length) : questions.length) * (Number(config.minutesPerQuestion) || 1))} min`} />
                 </div>
               </div>
 
