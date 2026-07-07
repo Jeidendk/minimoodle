@@ -258,7 +258,7 @@ function App() {
           {view === "result" && <ResultView data={data} quiz={selectedQuiz} user={user} setView={setView} />}
           {view === "teacher" && <EvaluationsManagerView data={data} user={user} setView={setView} setEditQuizId={setEditQuizId} deleteRows={deleteRows} />}
           {view === "evaluation-editor" && <EvaluationsView key={editQuizId || 'new'} data={data} user={user} setView={setView} saveRows={saveRows} deleteRows={deleteRows} goCourse={goCourse} editQuizId={editQuizId} />}
-          {view === "grades" && <GradesView setView={setView} />}
+          {view === "grades" && <GradesView data={data} setView={setView} />}
           {view === "students" && <StudentsView data={data} user={user} setView={setView} saveRows={saveRows} deleteRows={deleteRows} />}
           {view === "attempts" && <AttemptsView data={data} setView={setView} />}
           {view === "communication" && <CommunicationView setView={setView} />}

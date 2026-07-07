@@ -95,16 +95,8 @@ export default function StudentsView({ data, user, setView, saveRows, deleteRows
 
   const dbStudents = data.students || [];
 
-  // Auto-seed the students table on first run so the demo has content.
-  useEffect(() => {
-    if (!dbStudents.length && !seededRef.current && saveRows) {
-      seededRef.current = true;
-      saveRows('students', SEED_ROWS);
-    }
-  }, [dbStudents.length, saveRows]);
-
   const students = useMemo(
-    () => (dbStudents.length ? dbStudents.map(toView) : SEED_ROWS.map(toView)),
+    () => (dbStudents.length ? dbStudents.map(toView) : []),
     [dbStudents]
   );
 

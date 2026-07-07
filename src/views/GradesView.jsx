@@ -1,16 +1,112 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 
-const gradesData = [
-  { id: 1, name: "María Fernanda López", code: "MAT2025001", quiz1: 8.5, tarea1: 9.2, part: 9.0, exam: 8.8, final: 8.86, status: "Aprobado", avatar: "https://i.pravatar.cc/150?img=1" },
-  { id: 2, name: "Diego Alejandro Rojas", code: "MAT2025002", quiz1: 9.5, tarea1: 8.7, part: 9.5, exam: 9.0, final: 9.07, status: "Aprobado", avatar: "https://i.pravatar.cc/150?img=11" },
-  { id: 3, name: "Lucía Valentina Torres", code: "MAT2025003", quiz1: 7.0, tarea1: 7.5, part: 8.0, exam: 7.8, final: 7.75, status: "Aprobado", avatar: "https://i.pravatar.cc/150?img=5" },
-  { id: 4, name: "Carlos Andrés Morales", code: "MAT2025004", quiz1: 6.5, tarea1: 6.0, part: 7.0, exam: 6.2, final: 6.35, status: "En revisión", avatar: "https://i.pravatar.cc/150?img=12" },
-  { id: 5, name: "Sofía Camila Herrera", code: "MAT2025005", quiz1: 9.0, tarea1: 9.5, part: 9.0, exam: 9.3, final: 9.23, status: "Aprobado", avatar: "https://i.pravatar.cc/150?img=9" },
-  { id: 6, name: "Juan Sebastián Cruz", code: "MAT2025006", quiz1: 5.5, tarea1: 6.0, part: 6.5, exam: 5.8, final: 5.92, status: "Pendiente", avatar: "https://i.pravatar.cc/150?img=14" },
-];
-
-export default function GradesView({ setView }) {
+export default function GradesView({ data, setView }) {
   const [activeTab, setActiveTab] = useState("notas");
+  const [selectedCourseId, setSelectedCourseId] = useState(data?.courses?.[0]?.id || "");
+  const [search, setSearch] = useState("");
+  const [perPage, setPerPage] = useState(6);
+  const [page, setPage] = useState(1);
+
+  // Derived data based on selected course
+  const selectedCourse = useMemo(() => 
+    data?.courses?.find(c => c.id === selectedCourseId) || null
+  , [data, selectedCourseId]);
+
+  const courseQuizzes = useMemo(() => 
+    data?.quizzes?.filter(q => q.course_id === selectedCourseId) || []
+  , [data, selectedCourseId]);
+
+  // Find students enrolled in this course
+  // Assuming data.students has a 'courses' array like [{ label: 'Razonamiento Matemático' }]
+  const enrolledStudents = useMemo(() => {
+    if (!selectedCourse) return [];
+    return (data?.students || []).filter(s => {
+      const courseLabels = Array.isArray(s.courses) ? s.courses.map(c => c.label) : [];
+      // Also match if the course list is empty just to show some data, 
+      // or strictly match by course title
+      return courseLabels.includes(selectedCourse.title) || courseLabels.length === 0; 
+    });
+  }, [data, selectedCourse]);
+
+  // For each enrolled student, calculate their grades based on attempts
+  const gradesData = useMemo(() => {
+    return enrolledStudents.map(student => {
+      // Find the profile for this student to get the correct student_id for attempts
+      const profile = data?.profiles?.find(p => p.cedula === student.cedula);
+      
+      const studentGrades = {};
+      let totalScore = 0;
+      let totalPossible = 0;
+
+      courseQuizzes.forEach(quiz => {
+        // Find attempt for this student and quiz
+        const attempt = profile 
+          ? data?.attempts?.find(a => a.student_id === profile.id && a.quiz_id === quiz.id)
+          : data?.attempts?.find(a => a.student_name === student.full_name && a.quiz_id === quiz.id); // Fallback by name
+
+        if (attempt) {
+          // Normalize score to 10
+          const normalizedScore = attempt.total > 0 ? (Number(attempt.score) / Number(attempt.total)) * 10 : 0;
+          studentGrades[quiz.id] = normalizedScore.toFixed(2);
+          totalScore += normalizedScore;
+          totalPossible += 10;
+        } else {
+          studentGrades[quiz.id] = "-";
+        }
+      });
+
+      const finalAverage = totalPossible > 0 ? (totalScore / (courseQuizzes.length * 10)) * 10 : 0;
+      let status = "Pendiente";
+      if (totalPossible > 0) {
+        if (finalAverage >= 7) status = "Aprobado";
+        else if (finalAverage >= 5) status = "En revisión";
+        else status = "En riesgo";
+      }
+
+      return {
+        id: student.id,
+        name: student.full_name || student.name,
+        code: student.code || "-",
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(student.full_name || "Estudiante")}&background=random`,
+        grades: studentGrades,
+        final: finalAverage.toFixed(2),
+        status,
+        hasAttempts: totalPossible > 0
+      };
+    });
+  }, [enrolledStudents, courseQuizzes, data]);
+
+  // Filtering and pagination
+  const filteredData = useMemo(() => {
+    return gradesData.filter(s => 
+      s.name.toLowerCase().includes(search.toLowerCase()) || 
+      s.code.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [gradesData, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / perPage));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * perPage;
+  const currentRows = filteredData.slice(start, start + perPage);
+
+  // Stats
+  const stats = useMemo(() => {
+    const total = gradesData.length;
+    const evaluated = gradesData.filter(g => g.hasAttempts).length;
+    const approved = gradesData.filter(g => g.status === "Aprobado").length;
+    const atRisk = gradesData.filter(g => g.status === "En riesgo" || g.status === "En revisión").length;
+    const pending = gradesData.filter(g => g.status === "Pendiente").length;
+    
+    const validFinals = gradesData.filter(g => g.hasAttempts).map(g => parseFloat(g.final));
+    const generalAvg = validFinals.length ? (validFinals.reduce((a,b)=>a+b,0) / validFinals.length).toFixed(2) : "0.00";
+
+    return {
+      total, evaluated, approved, atRisk, pending, generalAvg,
+      pctApproved: total ? Math.round((approved/total)*100) : 0,
+      pctAtRisk: total ? Math.round((atRisk/total)*100) : 0,
+      pctPending: total ? Math.round((pending/total)*100) : 0
+    };
+  }, [gradesData]);
 
   return (
     <section className="courses-dashboard fade-in">
@@ -33,8 +129,8 @@ export default function GradesView({ setView }) {
             </div>
             <div>
               <span className="eval-metric-label">Curso seleccionado</span>
-              <span className="eval-metric-value">Razonamiento Matemático</span>
-              <span className="eval-metric-sub">3er grado de secundaria</span>
+              <span className="eval-metric-value">{selectedCourse?.title || "Ninguno"}</span>
+              <span className="eval-metric-sub">{selectedCourse?.parallel || "-"}</span>
             </div>
           </div>
           
@@ -44,8 +140,8 @@ export default function GradesView({ setView }) {
             </div>
             <div>
               <span className="eval-metric-label">Estudiantes</span>
-              <span className="eval-metric-value">28</span>
-              <span className="eval-metric-sub">24 calificados</span>
+              <span className="eval-metric-value">{stats.total}</span>
+              <span className="eval-metric-sub">{stats.evaluated} con notas</span>
             </div>
           </div>
 
@@ -55,8 +151,8 @@ export default function GradesView({ setView }) {
             </div>
             <div>
               <span className="eval-metric-label">Promedio general</span>
-              <span className="eval-metric-value">8.7 / 10</span>
-              <span className="eval-metric-sub" style={{ color: 'var(--color-success)', fontWeight: 600 }}>↑ 0.6 vs. periodo anterior</span>
+              <span className="eval-metric-value">{stats.generalAvg} / 10</span>
+              <span className="eval-metric-sub" style={{ color: 'var(--color-success)', fontWeight: 600 }}>Actualizado</span>
             </div>
           </div>
 
@@ -66,8 +162,8 @@ export default function GradesView({ setView }) {
             </div>
             <div>
               <span className="eval-metric-label">Pendientes</span>
-              <span className="eval-metric-value">4</span>
-              <span className="eval-metric-sub">Por revisar</span>
+              <span className="eval-metric-value">{stats.pending}</span>
+              <span className="eval-metric-sub">Por evaluar</span>
             </div>
           </div>
         </div>
@@ -112,25 +208,19 @@ export default function GradesView({ setView }) {
             <div className="grades-filters">
               <div className="eval-form-group">
                 <label>Curso</label>
-                <div className="eval-select-wrapper"><select defaultValue="mat"><option value="mat">Razonamiento Matemático</option></select></div>
-              </div>
-              <div className="eval-form-group">
-                <label>Unidad / Tema</label>
-                <div className="eval-select-wrapper"><select defaultValue="u2"><option value="u2">Unidad 2: Proporciones</option></select></div>
-              </div>
-              <div className="eval-form-group">
-                <label>Evaluación</label>
-                <div className="eval-select-wrapper"><select defaultValue="diag"><option value="diag">Evaluación diagnóstica</option></select></div>
-              </div>
-              <div className="eval-form-group">
-                <label>Periodo</label>
-                <div className="eval-select-wrapper"><select defaultValue="2025"><option value="2025">2025 - 1</option></select></div>
+                <div className="eval-select-wrapper">
+                  <select value={selectedCourseId} onChange={(e) => setSelectedCourseId(e.target.value)}>
+                    {data?.courses?.map(c => (
+                      <option key={c.id} value={c.id}>{c.title}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="eval-form-group" style={{ flex: 1.5 }}>
                 <label>Buscar estudiante</label>
                 <div className="eval-input-icon">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                  <input type="text" className="eval-input" placeholder="Buscar por nombre o código..." />
+                  <input type="text" className="eval-input" placeholder="Buscar por nombre o código..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
               </div>
             </div>
@@ -141,17 +231,22 @@ export default function GradesView({ setView }) {
                   <tr>
                     <th className="text-left">Estudiante</th>
                     <th className="text-left">Código</th>
-                    <th>Quiz 1 <br/><small>(15%)</small></th>
-                    <th>Tarea 1 <br/><small>(20%)</small></th>
-                    <th>Participación <br/><small>(10%)</small></th>
-                    <th>Examen <br/><small>(55%)</small></th>
+                    {courseQuizzes.map((quiz, idx) => (
+                      <th key={quiz.id} title={quiz.title}>
+                        Eval {idx + 1} <br/><small>(10pts)</small>
+                      </th>
+                    ))}
+                    {courseQuizzes.length === 0 && <th>Sin evaluaciones</th>}
                     <th>Promedio final <br/><small>(/10)</small></th>
                     <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {gradesData.map(row => (
+                  {currentRows.length === 0 ? (
+                    <tr><td colSpan={5 + courseQuizzes.length} className="text-center" style={{padding: '2rem'}}>No hay datos para mostrar</td></tr>
+                  ) : null}
+                  {currentRows.map(row => (
                     <tr key={row.id}>
                       <td>
                         <div className="gr-student">
@@ -160,11 +255,15 @@ export default function GradesView({ setView }) {
                         </div>
                       </td>
                       <td className="gr-code">{row.code}</td>
-                      <td className="text-center">{row.quiz1}</td>
-                      <td className="text-center">{row.tarea1}</td>
-                      <td className="text-center">{row.part}</td>
-                      <td className="text-center">{row.exam}</td>
-                      <td className="text-center font-bold" style={{ color: row.final >= 7 ? 'var(--color-primary)' : 'var(--color-danger)' }}>{row.final}</td>
+                      
+                      {courseQuizzes.map(quiz => (
+                        <td key={quiz.id} className="text-center">{row.grades[quiz.id]}</td>
+                      ))}
+                      {courseQuizzes.length === 0 && <td className="text-center">-</td>}
+
+                      <td className="text-center font-bold" style={{ color: row.final >= 7 ? 'var(--color-primary)' : (row.hasAttempts ? 'var(--color-danger)' : 'inherit') }}>
+                        {row.hasAttempts ? row.final : "-"}
+                      </td>
                       <td className="text-center">
                         <div className={`gr-status ${row.status.toLowerCase().replace(' ', '-')}`}>
                           <div className="dot"></div> {row.status}
@@ -173,7 +272,6 @@ export default function GradesView({ setView }) {
                       <td className="text-center">
                         <div className="gr-actions">
                           <button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
-                          <button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
                         </div>
                       </td>
                     </tr>
@@ -183,18 +281,17 @@ export default function GradesView({ setView }) {
             </div>
 
             <div className="grades-footer">
-              <div className="gr-pagination-info">Mostrando 1-6 de 28 estudiantes</div>
+              <div className="gr-pagination-info">Mostrando {start + 1}-{Math.min(start + perPage, filteredData.length)} de {filteredData.length} estudiantes</div>
               <div className="gr-pagination-controls">
-                <button className="gr-page-btn">&lt;</button>
-                <button className="gr-page-btn active">1</button>
-                <button className="gr-page-btn">2</button>
-                <button className="gr-page-btn">3</button>
-                <button className="gr-page-btn">4</button>
-                <button className="gr-page-btn">5</button>
-                <button className="gr-page-btn">&gt;</button>
+                <button className="gr-page-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>&lt;</button>
+                <button className="gr-page-btn active">{page}</button>
+                <button className="gr-page-btn" disabled={page === totalPages || totalPages === 0} onClick={() => setPage(p => p + 1)}>&gt;</button>
               </div>
               <div className="eval-select-wrapper" style={{ width: '100px' }}>
-                <select defaultValue="6"><option value="6">6 por página</option></select>
+                <select value={perPage} onChange={e => {setPerPage(Number(e.target.value)); setPage(1);}}>
+                  <option value="6">6 por página</option>
+                  <option value="12">12 por página</option>
+                </select>
               </div>
             </div>
 
@@ -223,7 +320,7 @@ export default function GradesView({ setView }) {
             <div className="gr-donut-container">
               <div className="gr-donut-chart">
                 <div className="gr-donut-hole">
-                  <strong>28</strong>
+                  <strong>{stats.total}</strong>
                   <span>Estudiantes</span>
                 </div>
               </div>
@@ -231,17 +328,17 @@ export default function GradesView({ setView }) {
                 <div className="gr-legend-item">
                   <div className="gr-legend-dot" style={{ background: 'var(--color-success)' }}></div>
                   <span className="gr-legend-label">Aprobados</span>
-                  <span className="gr-legend-val">82% (23)</span>
+                  <span className="gr-legend-val">{stats.pctApproved}% ({stats.approved})</span>
                 </div>
                 <div className="gr-legend-item">
                   <div className="gr-legend-dot" style={{ background: 'var(--color-warning)' }}></div>
-                  <span className="gr-legend-label">En riesgo</span>
-                  <span className="gr-legend-val">11% (3)</span>
+                  <span className="gr-legend-label">En riesgo/revisión</span>
+                  <span className="gr-legend-val">{stats.pctAtRisk}% ({stats.atRisk})</span>
                 </div>
                 <div className="gr-legend-item">
                   <div className="gr-legend-dot" style={{ background: 'var(--color-danger)' }}></div>
                   <span className="gr-legend-label">Pendientes</span>
-                  <span className="gr-legend-val">7% (2)</span>
+                  <span className="gr-legend-val">{stats.pctPending}% ({stats.pending})</span>
                 </div>
               </div>
             </div>
@@ -253,57 +350,26 @@ export default function GradesView({ setView }) {
               Vista del estudiante
             </div>
             
-            <div className="gr-student-card">
-              <img src="https://i.pravatar.cc/150?img=5" alt="student" />
-              <div>
-                <strong>Lucía Valentina Torres</strong>
-                <span>MAT2025003</span>
-              </div>
-            </div>
-
-            <div className="gr-student-metrics">
-              <div className="gr-sm-box">
-                <span>Promedio actual</span>
-                <div className="gr-sm-val text-blue">7.75 <small>/ 10</small></div>
-              </div>
-              <div className="gr-sm-box">
-                <span>Última evaluación</span>
-                <div className="gr-sm-val">7.8 <small>/ 10</small></div>
-                <span className="gr-sm-sub">Examen</span>
-              </div>
-            </div>
-
-            <div className="gr-bar-chart">
-              <div className="gr-bar-title">Progreso por evaluación</div>
-              <div className="gr-bar-content">
-                <div className="gr-bar-axis">
-                  <span>10</span><span>5</span><span>0</span>
-                </div>
-                <div className="gr-bars">
-                  <div className="gr-bar-col">
-                    <div className="gr-bar-val">7.0</div>
-                    <div className="gr-bar-fill-wrap"><div className="gr-bar-fill" style={{ height: '70%' }}></div></div>
-                    <div className="gr-bar-label">Quiz 1</div>
-                  </div>
-                  <div className="gr-bar-col">
-                    <div className="gr-bar-val">7.5</div>
-                    <div className="gr-bar-fill-wrap"><div className="gr-bar-fill" style={{ height: '75%' }}></div></div>
-                    <div className="gr-bar-label">Tarea 1</div>
-                  </div>
-                  <div className="gr-bar-col">
-                    <div className="gr-bar-val">8.0</div>
-                    <div className="gr-bar-fill-wrap"><div className="gr-bar-fill" style={{ height: '80%' }}></div></div>
-                    <div className="gr-bar-label">Participación</div>
-                  </div>
-                  <div className="gr-bar-col">
-                    <div className="gr-bar-val">7.8</div>
-                    <div className="gr-bar-fill-wrap"><div className="gr-bar-fill" style={{ height: '78%' }}></div></div>
-                    <div className="gr-bar-label">Examen</div>
+            {currentRows.length > 0 ? (
+              <>
+                <div className="gr-student-card">
+                  <img src={currentRows[0].avatar} alt="student" />
+                  <div>
+                    <strong>{currentRows[0].name}</strong>
+                    <span>{currentRows[0].code}</span>
                   </div>
                 </div>
-              </div>
-            </div>
 
+                <div className="gr-student-metrics">
+                  <div className="gr-sm-box">
+                    <span>Promedio actual</span>
+                    <div className="gr-sm-val text-blue">{currentRows[0].hasAttempts ? currentRows[0].final : "-"} <small>/ 10</small></div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{padding: '1rem', color: '#666'}}>Selecciona un estudiante para ver sus detalles</div>
+            )}
           </div>
 
           <div className="eval-side-panel">
@@ -314,19 +380,15 @@ export default function GradesView({ setView }) {
             <div className="eval-validations">
               <div className="eval-val-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="16 10 12 14 8 10"></polyline></svg>
-                24 estudiantes con nota final
+                {stats.evaluated} estudiantes con notas
               </div>
               <div className="eval-val-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="16 10 12 14 8 10"></polyline></svg>
-                4 evaluaciones pendientes
+                {stats.pending} pendientes
               </div>
               <div className="eval-val-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="16 10 12 14 8 10"></polyline></svg>
-                Promedios calculados correctamente
-              </div>
-              <div className="eval-val-item">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="16 10 12 14 8 10"></polyline></svg>
-                Listo para publicar
+                Promedios calculados automáticamente
               </div>
             </div>
           </div>
