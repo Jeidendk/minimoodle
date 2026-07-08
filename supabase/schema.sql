@@ -82,7 +82,9 @@ create table if not exists public.questions (
 create table if not exists public.attempts (
   id text primary key,
   quiz_id text not null references public.quizzes(id) on delete cascade,
-  student_id text references public.profiles(id) on delete set null,
+  -- student_id may reference a profile OR a students-table row (access-code
+  -- users are not in profiles), so no FK here.
+  student_id text,
   student_name text not null,
   answers jsonb not null default '{}'::jsonb,
   question_ids jsonb not null default '[]'::jsonb,
@@ -124,6 +126,8 @@ alter table public.attempts  add column if not exists total numeric not null def
 alter table public.attempts  add column if not exists student_name text not null default '';
 -- questions.quiz_id must allow NULL for bank-only questions
 alter table public.questions alter column quiz_id drop not null;
+-- attempts.student_id may point at a students-table row (access-code users), not profiles.
+alter table public.attempts  drop constraint if exists attempts_student_id_fkey;
 
 alter table public.profiles       enable row level security;
 alter table public.courses        enable row level security;

@@ -32,6 +32,39 @@ function loadStoredSession() {
   }
 }
 
+// Resolve a login identifier (cédula, access code, or full name) to a user.
+// Checks teacher/demo profiles first, then the students table (access codes).
+function resolveUser(data, identifier) {
+  const id = String(identifier || "").trim();
+  if (!id) return null;
+  const norm = id.toUpperCase();
+  const lower = id.toLowerCase();
+
+  const profile = (data.profiles || []).find(
+    (p) => p.cedula === id || (p.code && p.code.toUpperCase() === norm)
+  );
+  if (profile) return profile;
+
+  const students = data.students || [];
+  const s =
+    students.find((st) => (st.code || "").toUpperCase() === norm) ||
+    students.find((st) => st.cedula && st.cedula === id) ||
+    students.find((st) => (st.full_name || "").toLowerCase() === lower);
+  if (s) {
+    // Synthesize a student profile so the app (attempts, tracking) works.
+    return {
+      id: s.id,
+      full_name: s.full_name,
+      cedula: s.cedula || "",
+      email: s.email || "",
+      role: "student",
+      code: s.code || "",
+      _student: true,
+    };
+  }
+  return null;
+}
+
 function App() {
   const [data, setData] = useState(null);
   const [user, setUser] = useState(null);
@@ -50,9 +83,10 @@ function App() {
     loadData().then((d) => {
       setData(d);
       const stored = loadStoredSession();
-      if (stored?.cedula) {
-        const profile = d.profiles.find((p) => p.cedula === stored.cedula || p.code === stored.cedula);
-        if (profile) setUser(profile);
+      const ref = stored?.ref || stored?.cedula;
+      if (ref) {
+        const u = resolveUser(d, ref);
+        if (u) setUser(u);
       }
     }).catch((err) => setError(err.message || "No se pudo cargar la información."));
   }, []);
@@ -64,14 +98,14 @@ function App() {
   const selectedCourse = data?.courses.find((course) => course.id === selectedCourseId);
   const selectedQuiz = data?.quizzes.find((quiz) => quiz.id === selectedQuizId);
 
-  function handleLogin(cedula, remember = true) {
+  function handleLogin(identifier, remember = true) {
     if (!data) return false;
-    const profile = data.profiles.find((p) => p.cedula === cedula || p.code === cedula);
-    if (profile) {
-      setUser(profile);
+    const u = resolveUser(data, identifier);
+    if (u) {
+      setUser(u);
       setView("area");
       try {
-        const payload = JSON.stringify({ cedula });
+        const payload = JSON.stringify({ ref: String(identifier).trim() });
         if (remember) {
           localStorage.setItem(SESSION_KEY, payload);
           sessionStorage.removeItem(SESSION_KEY);
@@ -80,6 +114,13 @@ function App() {
           localStorage.removeItem(SESSION_KEY);
         }
       } catch {}
+      // Mark a pending student as active on first successful login.
+      if (u._student) {
+        const s = (data.students || []).find((st) => st.id === u.id);
+        if (s && s.status !== "Activo") {
+          saveRows("students", { ...s, status: "Activo" });
+        }
+      }
       return true;
     }
     return false;
