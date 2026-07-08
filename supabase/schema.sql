@@ -56,8 +56,9 @@ create table if not exists public.quizzes (
   closes_at timestamptz,
   time_limit_minutes integer not null default 30,
   published boolean not null default false,
-  -- Bank-draw simulator config (null bank_id = classic quiz with its own questions)
-  bank_id text references public.question_banks(id) on delete set null,
+  -- Bank-draw simulator config. bank_id holds ONE bank id, or several joined
+  -- by commas ("b1,b2") for multi-bank simulators — so no FK here on purpose.
+  bank_id text,
   question_count integer not null default 0,
   minutes_per_question integer not null default 1,
   shuffle_questions boolean not null default true,
@@ -107,12 +108,14 @@ create table if not exists public.students (
 -- Row Level Security (demo: open policies)
 -- ------------------------------------------------------------------
 -- Idempotent migration for projects that already ran an earlier schema version.
-alter table public.quizzes   add column if not exists bank_id text references public.question_banks(id) on delete set null;
+alter table public.quizzes   add column if not exists bank_id text;
+-- Drop any old FK on quizzes.bank_id so multi-bank CSV values ("b1,b2") are allowed.
+alter table public.quizzes   drop constraint if exists quizzes_bank_id_fkey;
+alter table public.question_banks add column if not exists area text not null default '';
 alter table public.quizzes   add column if not exists question_count integer not null default 0;
 alter table public.quizzes   add column if not exists minutes_per_question integer not null default 1;
 alter table public.quizzes   add column if not exists shuffle_questions boolean not null default true;
 alter table public.quizzes   add column if not exists shuffle_options boolean not null default true;
-alter table public.quizzes   add column if not exists bank_ids jsonb not null default '[]'::jsonb;
 alter table public.questions add column if not exists bank_id text references public.question_banks(id) on delete cascade;
 alter table public.attempts  add column if not exists answers jsonb not null default '{}'::jsonb;
 alter table public.attempts  add column if not exists question_ids jsonb not null default '[]'::jsonb;
