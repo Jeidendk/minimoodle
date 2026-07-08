@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 
 function shuffle(arr) {
   const a = [...arr];
@@ -16,6 +16,7 @@ export default function QuizView({ data, quiz, user, submitAttempt, setView }) {
   const [timeLeft, setTimeLeft] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [markedForReview, setMarkedForReview] = useState(new Set());
+  const submittedRef = useRef(false); // guards against duplicate submits (timer loop)
 
   const isBank = Boolean(quiz?.bank_id);
   const minutesPerQuestion = Number(quiz?.minutes_per_question) || 1;
@@ -90,16 +91,20 @@ export default function QuizView({ data, quiz, user, submitAttempt, setView }) {
     return () => clearInterval(timerId);
   }, [started, timeLeft]);
 
-  // Auto-submit when time is up
+  const finish = () => {
+    if (submittedRef.current) return;      // prevent duplicate submissions
+    submittedRef.current = true;
+    submitAttempt(answers, questions.map((q) => q.id));
+  };
+
+  // Auto-submit when time is up (guarded — runs at most once)
   useEffect(() => {
-    if (started && timeLeft === 0 && questions.length > 0) {
-      submitAttempt(answers, questions.map((q) => q.id));
+    if (started && !submittedRef.current && timeLeft === 0 && questions.length > 0) {
+      finish();
     }
-  }, [started, timeLeft, questions, answers, submitAttempt]);
+  }, [started, timeLeft, questions.length]);
 
   if (!quiz) return <p>Cuestionario no encontrado.</p>;
-
-  const finish = () => submitAttempt(answers, questions.map((q) => q.id));
 
   const answered = Object.keys(answers).length;
 
