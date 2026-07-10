@@ -165,18 +165,26 @@ export function profilesToPlain(rows) {
   return rows.map((row) => ({ ...row }));
 }
 
-// Fetch one table; tolerate missing table / errors so a partially-migrated
-// database never blocks the whole app (avoids "Invalid path specified").
+// Fetch one table with pagination. Supabase/PostgREST caps a single response at
+// 1000 rows, so tables like `questions` (thousands of bank items) would silently
+// truncate — making newly added banks appear empty. Loop with .range() to get all.
+// Also tolerates a missing table so a partially-migrated DB never blocks the app.
+const PAGE_SIZE = 1000;
 async function safeSelect(table, orderCol, opts = {}) {
   try {
-    let query = supabase.from(table).select("*");
-    if (orderCol) query = query.order(orderCol, opts);
-    const { data, error } = await query;
-    if (error) {
-      console.warn(`[minimoodle] tabla "${table}" no disponible:`, error.message);
-      return null;
+    const rows = [];
+    for (let from = 0; ; from += PAGE_SIZE) {
+      let query = supabase.from(table).select("*").range(from, from + PAGE_SIZE - 1);
+      if (orderCol) query = query.order(orderCol, opts);
+      const { data, error } = await query;
+      if (error) {
+        console.warn(`[minimoodle] tabla "${table}" no disponible:`, error.message);
+        return from === 0 ? null : rows; // keep what we already fetched
+      }
+      rows.push(...(data || []));
+      if (!data || data.length < PAGE_SIZE) break; // last page
     }
-    return data;
+    return rows;
   } catch (err) {
     console.warn(`[minimoodle] error leyendo "${table}":`, err?.message || err);
     return null;
